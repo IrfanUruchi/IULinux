@@ -20,6 +20,9 @@ THEME_OVERRIDE="${BREEZE_THEME}/theme.conf.user"
 
 WALLPAPER="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/1672x941.png"
 
+FACE_DIR="${ROOTFS_DIR}/usr/share/sddm/faces"
+LIVE_FACE="${FACE_DIR}/iulinux.face.icon"
+
 package_status()
 {
     dpkg-query \
@@ -114,5 +117,21 @@ grep -qx 'Session=plasma.desktop' "${LIVE_CONFIG}" ||
 
 grep -qx 'Relogin=false' "${LIVE_CONFIG}" ||
     fail "IULinux live SDDM relogin policy changed"
+
+# ------------------------------------------------------------
+# IULinux live-user avatar
+# ------------------------------------------------------------
+
+grep -qx 'FacesDir=/usr/share/sddm/faces' "${SDDM_POLICY}" ||
+    fail "IULinux SDDM FacesDir policy missing"
+
+grep -qx 'EnableAvatars=true' "${SDDM_POLICY}" ||
+    fail "IULinux SDDM avatar policy missing"
+
+[[ -f "${LIVE_FACE}" ]] ||
+    fail "IULinux live-user SDDM avatar missing"
+
+[[ -s "${LIVE_FACE}" ]] ||
+    fail "IULinux live-user SDDM avatar is empty"
 
 echo "[PASS] IULinux SDDM branding"
