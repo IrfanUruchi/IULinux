@@ -1,0 +1,17 @@
+# Generated build artifacts
+build/*
+!build/.gitkeep
+
+# Images
+*.iso
+*.img
+*.squashfs
+
+# Temporary files
+*.tmp
+*.log
+
+# Editors
+.vscode/
+.idea/
+*~
