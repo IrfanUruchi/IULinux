@@ -1,0 +1,46 @@
+# IULinux KDE Plasma desktop
+#
+# Keep applications intentionally minimal here.
+# Development, AI and optional workstation applications belong
+# in separate manifests.
+
+# Plasma shell / workspace
+plasma-desktop
+plasma-workspace
+plasma-session-wayland
+kwin-wayland
+
+# Display manager
+sddm
+
+# Core KDE integration
+plasma-nm
+plasma-pa
+powerdevil
+systemsettings
+polkit-kde-agent-1
+
+# Core applications
+dolphin
+konsole
+
+# Desktop portals / sandbox integration
+xdg-desktop-portal
+xdg-desktop-portal-kde
+
+# Wayland + legacy X compatibility
+xwayland
+
+# Audio
+pipewire
+pipewire-pulse
+wireplumber
+
+# Power
+power-profiles-daemon
+
+# Appearance / fonts
+breeze
+breeze-icon-theme
+fonts-noto-core
+fonts-noto-color-emoji
