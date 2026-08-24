@@ -1,0 +1,9 @@
+PRETTY_NAME="IULinux Development"
+NAME="IULinux"
+VERSION_ID="0.1-dev"
+VERSION="0.1 Development"
+ID=iulinux
+ID_LIKE="ubuntu debian"
+BUILD_ID=development
+UBUNTU_CODENAME=resolute
+UBUNTU_VERSION_ID="26.04"
