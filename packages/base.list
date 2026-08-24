@@ -1,0 +1,61 @@
+# IULinux base system
+#
+# Keep this list focused on the fundamental operating system.
+# Desktop, development, AI and workstation packages belong in
+# their own manifests.
+
+# Kernel / boot foundation
+linux-generic
+linux-firmware
+initramfs-tools
+kmod
+
+# Init / session foundation
+systemd-sysv
+dbus
+dbus-user-session
+sudo
+
+# Networking
+network-manager
+wpasupplicant
+iproute2
+iputils-ping
+rfkill
+
+# Hardware inspection / storage
+pciutils
+usbutils
+lshw
+dmidecode
+e2fsprogs
+dosfstools
+parted
+gdisk
+udisks2
+upower
+
+# Core utilities
+ca-certificates
+curl
+wget
+gnupg
+procps
+psmisc
+less
+nano
+vim-tiny
+bash-completion
+man-db
+
+# Locale / console
+locales
+tzdata
+keyboard-configuration
+console-setup
+
+# Desktop groundwork
+accountsservice
+polkitd
+xdg-user-dirs
+xdg-utils
