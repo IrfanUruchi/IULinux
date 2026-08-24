@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/LookAndFeel",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "IULinux Project"
+            }
+        ],
+        "Category": "",
+        "Description": "Default desktop experience for IULinux",
+        "EnabledByDefault": true,
+        "Id": "com.iulinux.desktop",
+        "License": "GPL-3.0-or-later",
+        "Name": "IULinux",
+        "Version": "0.1"
+    }
+}
