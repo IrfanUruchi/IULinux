@@ -1,0 +1,20 @@
+# IULinux default-image forbidden packages
+#
+# These packages should not ship in the default workstation image.
+# Users remain free to install alternatives themselves.
+
+firefox
+firefox-locale-en
+libreoffice
+libreoffice-core
+libreoffice-common
+thunderbird
+snapd
+kmail
+kontact
+korganizer
+akregator
+konversation
+kmahjongg
+kmines
+ksudoku
