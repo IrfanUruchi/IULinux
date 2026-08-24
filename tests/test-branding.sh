@@ -17,7 +17,7 @@ KDEGLOBALS="${ROOTFS_DIR}/etc/xdg/kdeglobals"
 LOGO="${ROOTFS_DIR}/usr/share/pixmaps/iulinux-logo.png"
 
 WALLPAPER_DIR="${ROOTFS_DIR}/usr/share/wallpapers/IULinux"
-WALLPAPER="${WALLPAPER_DIR}/contents/images/iulinux-default.png"
+WALLPAPER="${WALLPAPER_DIR}/contents/images/1672x941.png"
 WALLPAPER_META="${WALLPAPER_DIR}/metadata.json"
 
 [[ -f "${LAF}/metadata.json" ]] ||
@@ -30,6 +30,9 @@ grep -q '"Id": "com.iulinux.desktop"' \
 [[ -f "${LAF}/contents/defaults" ]] ||
     fail "IULinux Plasma defaults missing"
 
+[[ -f "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ]] ||
+    fail "IULinux Plasma desktop layout missing"
+
 grep -qx 'ColorScheme=BreezeDark' \
     "${LAF}/contents/defaults" ||
     fail "IULinux color scheme policy missing"
@@ -37,6 +40,9 @@ grep -qx 'ColorScheme=BreezeDark' \
 grep -qx 'Image=IULinux' \
     "${LAF}/contents/defaults" ||
     fail "IULinux default wallpaper policy missing"
+
+grep -qF     'file:///usr/share/wallpapers/IULinux/contents/images/1672x941.png'     "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ||
+    fail "IULinux desktop layout does not apply the branded wallpaper"
 
 [[ -f "${LOGO}" ]] ||
     fail "IULinux logo missing"
