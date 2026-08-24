@@ -46,6 +46,14 @@ sudo rsync \
     "${OVERLAY_DIR}/" \
     "${ROOTFS_DIR}/"
 
+# Netplan configuration must not be world-readable.
+if [[ -d "${ROOTFS_DIR}/etc/netplan" ]]; then
+    sudo find "${ROOTFS_DIR}/etc/netplan" \
+        -type f \
+        \( -name '*.yaml' -o -name '*.yml' \) \
+        -exec chmod 0600 {} +
+fi
+
 # Ubuntu normally exposes /etc/os-release through /usr/lib/os-release.
 # Re-establish that relationship explicitly.
 sudo rm -f "${ROOTFS_DIR}/etc/os-release"

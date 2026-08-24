@@ -130,6 +130,20 @@ menuentry "Try IULinux 0.1 Development (safe graphics)" {
 GRUB
 
 echo
+echo "[IULinux] Generating live-media checksums..."
+
+(
+    cd "${ISO_ROOT}"
+
+    find . \
+        -type f \
+        ! -name 'md5sum.txt' \
+        -print0 |
+        sort -z |
+        xargs -0 md5sum
+) > "${ISO_ROOT}/md5sum.txt"
+
+echo
 echo "[IULinux] Creating bootable ISO..."
 
 grub-mkrescue \

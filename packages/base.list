@@ -18,6 +18,7 @@ sudo
 
 # Networking
 network-manager
+netplan.io
 wpasupplicant
 iproute2
 iputils-ping
