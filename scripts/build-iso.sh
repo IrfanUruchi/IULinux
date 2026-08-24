@@ -15,8 +15,21 @@ ISO_NAME="IULinux-${IULINUX_VERSION}-${TARGET_ARCH}.iso"
 ISO_OUTPUT="${PROJECT_ROOT}/build/${ISO_NAME}"
 ISO_VOLUME_ID="IULINUX_DEV"
 
+GRUB_CONFIG_SOURCE="${PROJECT_ROOT}/config/grub.cfg"
+GRUB_BACKGROUND_SOURCE="${PROJECT_ROOT}/branding/grub/iulinux-grub-background.png"
+
 [[ -d "${ROOTFS_DIR}" ]] || {
     echo "[IULinux] Rootfs missing." >&2
+    exit 1
+}
+
+[[ -f "${GRUB_CONFIG_SOURCE}" ]] || {
+    echo "[IULinux] GRUB configuration missing." >&2
+    exit 1
+}
+
+[[ -f "${GRUB_BACKGROUND_SOURCE}" ]] || {
+    echo "[IULinux] GRUB background missing." >&2
     exit 1
 }
 
@@ -38,6 +51,7 @@ done
 "${PROJECT_ROOT}/tests/test-onlyoffice.sh"
 "${PROJECT_ROOT}/tests/test-branding.sh"
 "${PROJECT_ROOT}/tests/test-sddm-branding.sh"
+"${PROJECT_ROOT}/tests/test-grub-branding.sh"
 
 echo
 echo "============================================"
@@ -118,22 +132,19 @@ sudo mksquashfs \
 sudo chown "$(id -u):$(id -g)" \
     "${ISO_ROOT}/casper/filesystem.squashfs"
 
-cat > "${ISO_ROOT}/boot/grub/grub.cfg" <<'GRUB'
-set default=0
-set timeout=5
+echo "[IULinux] Installing GRUB branding..."
 
-insmod all_video
+cp \
+    "${GRUB_CONFIG_SOURCE}" \
+    "${ISO_ROOT}/boot/grub/grub.cfg"
 
-menuentry "Try IULinux 0.1 Development" {
-    linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live noprompt ---
-    initrd /casper/initrd
-}
+cp \
+    "${GRUB_BACKGROUND_SOURCE}" \
+    "${ISO_ROOT}/boot/grub/iulinux-grub-background.png"
 
-menuentry "Try IULinux 0.1 Development (safe graphics)" {
-    linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live noprompt nomodeset ---
-    initrd /casper/initrd
-}
-GRUB
+chmod 0644 \
+    "${ISO_ROOT}/boot/grub/grub.cfg" \
+    "${ISO_ROOT}/boot/grub/iulinux-grub-background.png"
 
 echo
 echo "[IULinux] Generating live-media checksums..."
