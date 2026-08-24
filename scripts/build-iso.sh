@@ -37,6 +37,7 @@ done
 "${PROJECT_ROOT}/tests/test-brave.sh"
 "${PROJECT_ROOT}/tests/test-onlyoffice.sh"
 "${PROJECT_ROOT}/tests/test-branding.sh"
+"${PROJECT_ROOT}/tests/test-sddm-branding.sh"
 
 echo
 echo "============================================"
