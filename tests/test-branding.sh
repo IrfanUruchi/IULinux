@@ -18,7 +18,7 @@ LOGO="${ROOTFS_DIR}/usr/share/pixmaps/iulinux-logo.png"
 LAUNCHER_ICON="${ROOTFS_DIR}/usr/share/icons/hicolor/512x512/apps/iulinux.png"
 
 WALLPAPER_DIR="${ROOTFS_DIR}/usr/share/wallpapers/IULinux"
-WALLPAPER="${WALLPAPER_DIR}/contents/images/1672x941.png"
+WALLPAPER="${WALLPAPER_DIR}/contents/images/3840x2160.png"
 WALLPAPER_META="${WALLPAPER_DIR}/metadata.json"
 
 [[ -f "${LAF}/metadata.json" ]] ||
@@ -42,7 +42,7 @@ grep -qx 'Image=IULinux' \
     "${LAF}/contents/defaults" ||
     fail "IULinux default wallpaper policy missing"
 
-grep -qF     'file:///usr/share/wallpapers/IULinux/contents/images/1672x941.png'     "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ||
+grep -qF     'file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png'     "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ||
     fail "IULinux desktop layout does not apply the branded wallpaper"
 
 [[ -f "${LOGO}" ]] ||
@@ -85,5 +85,27 @@ grep -qx 'Name=IULinux' "${BRANDING}" ||
 grep -qx 'LookAndFeelPackage=com.iulinux.desktop' \
     "${KDEGLOBALS}" ||
     fail "IULinux Look-and-Feel is not the default"
+
+for resolution in     3840x2160     2560x1440     1920x1080
+do
+    image="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/${resolution}.png"
+
+    [[ -f "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper missing"
+
+    [[ -s "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper is empty"
+done
+
+for resolution in     3840x2160     2560x1440     1920x1080
+do
+    image="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/${resolution}.png"
+
+    [[ -f "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper missing"
+
+    [[ -s "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper is empty"
+done
 
 echo "[PASS] IULinux branding infrastructure"

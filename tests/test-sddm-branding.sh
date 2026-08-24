@@ -18,7 +18,7 @@ BREEZE_MAIN="${BREEZE_THEME}/Main.qml"
 BREEZE_CONFIG="${BREEZE_THEME}/theme.conf"
 THEME_OVERRIDE="${BREEZE_THEME}/theme.conf.user"
 
-WALLPAPER="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/1672x941.png"
+WALLPAPER="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/3840x2160.png"
 
 FACE_DIR="${ROOTFS_DIR}/usr/share/sddm/faces"
 LIVE_FACE="${FACE_DIR}/iulinux.face.icon"
@@ -85,7 +85,7 @@ grep -qx 'type=image' "${THEME_OVERRIDE}" ||
     fail "IULinux SDDM image mode missing"
 
 grep -qx \
-    'background=/usr/share/wallpapers/IULinux/contents/images/1672x941.png' \
+    'background=/usr/share/wallpapers/IULinux/contents/images/3840x2160.png' \
     "${THEME_OVERRIDE}" ||
     fail "IULinux SDDM wallpaper policy incorrect"
 

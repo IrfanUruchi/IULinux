@@ -25,7 +25,7 @@ for (var i = 0; i < iulinuxDesktops.length; ++i) {
 
     desktop.writeConfig(
         "Image",
-        "file:///usr/share/wallpapers/IULinux/contents/images/1672x941.png"
+        "file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png"
     );
 }
 
