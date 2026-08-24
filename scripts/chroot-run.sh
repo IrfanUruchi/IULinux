@@ -87,6 +87,7 @@ mount_fs sysfs sys "${ROOTFS_DIR}/sys"
 sudo chroot "${ROOTFS_DIR}" \
     /usr/bin/env \
     HOME=/root \
-    LC_ALL=C \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
     "$@"
