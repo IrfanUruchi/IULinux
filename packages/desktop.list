@@ -1,46 +1,38 @@
-# IULinux KDE Plasma desktop
 #
-# Keep applications intentionally minimal here.
-# Development, AI and optional workstation applications belong
-# in separate manifests.
-
-# Plasma shell / workspace
-plasma-desktop
-plasma-workspace
-plasma-session-wayland
-kwin-wayland
-
-# Display manager
-sddm
-
-# Core KDE integration
-plasma-nm
-plasma-pa
-powerdevil
-systemsettings
-polkit-kde-agent-1
-
-# Core applications
-dolphin
-konsole
-
-# Desktop portals / sandbox integration
-xdg-desktop-portal
-xdg-desktop-portal-kde
-
-# Wayland + legacy X compatibility
-xwayland
-
-# Audio
-pipewire
-pipewire-pulse
-wireplumber
-
-# Power
-power-profiles-daemon
-
 # Appearance / fonts
+# Audio
 breeze
 breeze-icon-theme
-fonts-noto-core
+# Core applications
+# Core KDE integration
+# Desktop portals / sandbox integration
+# Development, AI and optional workstation applications belong
+# Display manager
+dolphin
 fonts-noto-color-emoji
+fonts-noto-core
+# in separate manifests.
+# IULinux KDE Plasma desktop
+# Keep applications intentionally minimal here.
+konsole
+kwin-wayland
+pipewire
+pipewire-pulse
+plasma-desktop
+plasma-nm
+plasma-pa
+plasma-session-wayland
+# Plasma shell / workspace
+plasma-workspace
+polkit-kde-agent-1
+# Power
+powerdevil
+power-profiles-daemon
+sddm
+sddm-theme-breeze
+systemsettings
+# Wayland + legacy X compatibility
+wireplumber
+xdg-desktop-portal
+xdg-desktop-portal-kde
+xwayland
