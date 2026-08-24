@@ -9,3 +9,6 @@ library=org.kde.breeze
 
 [plasmarc][Theme]
 name=breeze-dark
+
+[Wallpaper]
+Image=IULinux

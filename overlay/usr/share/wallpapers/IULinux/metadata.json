@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "IULinux Project"
+            }
+        ],
+        "Description": "Default IULinux desktop wallpaper",
+        "Id": "IULinux",
+        "License": "CC-BY-SA-4.0",
+        "Name": "IULinux"
+    }
+}
