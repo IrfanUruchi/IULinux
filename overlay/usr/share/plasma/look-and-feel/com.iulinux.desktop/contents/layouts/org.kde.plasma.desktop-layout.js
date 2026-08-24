@@ -28,3 +28,23 @@ for (var i = 0; i < iulinuxDesktops.length; ++i) {
         "file:///usr/share/wallpapers/IULinux/contents/images/1672x941.png"
     );
 }
+
+
+// ------------------------------------------------------------
+// IULinux launcher branding
+// ------------------------------------------------------------
+
+var iulinuxPanels = panels();
+
+for (var p = 0; p < iulinuxPanels.length; ++p) {
+    var panelWidgets = iulinuxPanels[p].widgets();
+
+    for (var w = 0; w < panelWidgets.length; ++w) {
+        var widget = panelWidgets[w];
+
+        if (widget.type === "org.kde.plasma.kickoff") {
+            widget.currentConfigGroup = ["General"];
+            widget.writeConfig("icon", "iulinux");
+        }
+    }
+}

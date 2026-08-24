@@ -15,6 +15,7 @@ BRANDING="${ROOTFS_DIR}/usr/share/iulinux/branding.conf"
 KDEGLOBALS="${ROOTFS_DIR}/etc/xdg/kdeglobals"
 
 LOGO="${ROOTFS_DIR}/usr/share/pixmaps/iulinux-logo.png"
+LAUNCHER_ICON="${ROOTFS_DIR}/usr/share/icons/hicolor/512x512/apps/iulinux.png"
 
 WALLPAPER_DIR="${ROOTFS_DIR}/usr/share/wallpapers/IULinux"
 WALLPAPER="${WALLPAPER_DIR}/contents/images/1672x941.png"
@@ -49,6 +50,15 @@ grep -qF     'file:///usr/share/wallpapers/IULinux/contents/images/1672x941.png'
 
 [[ -s "${LOGO}" ]] ||
     fail "IULinux logo is empty"
+
+[[ -f "${LAUNCHER_ICON}" ]] ||
+    fail "IULinux launcher icon missing"
+
+[[ -s "${LAUNCHER_ICON}" ]] ||
+    fail "IULinux launcher icon is empty"
+
+grep -qF 'widget.writeConfig("icon", "iulinux")'     "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ||
+    fail "IULinux launcher icon policy missing"
 
 [[ -f "${WALLPAPER}" ]] ||
     fail "IULinux wallpaper missing"
