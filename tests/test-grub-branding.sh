@@ -46,6 +46,12 @@ grep -qx 'insmod gfxterm' "${GRUB_CONFIG}" ||
 grep -qx 'insmod png' "${GRUB_CONFIG}" ||
     fail "GRUB PNG module policy missing"
 
+grep -qx 'loadfont /boot/grub/fonts/unicode.pf2' "${GRUB_CONFIG}" ||
+    fail "GRUB Unicode font policy missing"
+
+grep -qF 'GRUB_FONT_SOURCE="/usr/share/grub/unicode.pf2"' "${BUILD_SCRIPT}" ||
+    fail "GRUB Unicode font is not wired into ISO builder"
+
 grep -qx \
     'background_image /boot/grub/iulinux-grub-background.png' \
     "${GRUB_CONFIG}" ||

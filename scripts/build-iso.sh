@@ -17,6 +17,7 @@ ISO_VOLUME_ID="IULINUX_DEV"
 
 GRUB_CONFIG_SOURCE="${PROJECT_ROOT}/config/grub.cfg"
 GRUB_BACKGROUND_SOURCE="${PROJECT_ROOT}/branding/grub/iulinux-grub-background.png"
+GRUB_FONT_SOURCE="/usr/share/grub/unicode.pf2"
 
 [[ -d "${ROOTFS_DIR}" ]] || {
     echo "[IULinux] Rootfs missing." >&2
@@ -30,6 +31,11 @@ GRUB_BACKGROUND_SOURCE="${PROJECT_ROOT}/branding/grub/iulinux-grub-background.pn
 
 [[ -f "${GRUB_BACKGROUND_SOURCE}" ]] || {
     echo "[IULinux] GRUB background missing." >&2
+    exit 1
+}
+
+[[ -f "${GRUB_FONT_SOURCE}" ]] || {
+    echo "[IULinux] GRUB Unicode font missing." >&2
     exit 1
 }
 
@@ -142,9 +148,16 @@ cp \
     "${GRUB_BACKGROUND_SOURCE}" \
     "${ISO_ROOT}/boot/grub/iulinux-grub-background.png"
 
+mkdir -p "${ISO_ROOT}/boot/grub/fonts"
+
+cp \
+    "${GRUB_FONT_SOURCE}" \
+    "${ISO_ROOT}/boot/grub/fonts/unicode.pf2"
+
 chmod 0644 \
     "${ISO_ROOT}/boot/grub/grub.cfg" \
-    "${ISO_ROOT}/boot/grub/iulinux-grub-background.png"
+    "${ISO_ROOT}/boot/grub/iulinux-grub-background.png" \
+    "${ISO_ROOT}/boot/grub/fonts/unicode.pf2"
 
 echo
 echo "[IULinux] Generating live-media checksums..."
