@@ -34,6 +34,7 @@ done
 "${PROJECT_ROOT}/tests/test-live-system.sh"
 "${PROJECT_ROOT}/tests/test-network-policy.sh"
 "${PROJECT_ROOT}/tests/test-lean-runtime-policy.sh"
+"${PROJECT_ROOT}/tests/test-brave.sh"
 
 echo
 echo "============================================"
