@@ -1,1 +1,5 @@
 calamares
+squashfs-tools
+grub-pc-bin
+grub-efi-amd64-bin
+efibootmgr

@@ -59,6 +59,7 @@ done
 "${PROJECT_ROOT}/tests/test-sddm-branding.sh"
 "${PROJECT_ROOT}/tests/test-grub-branding.sh"
 "${PROJECT_ROOT}/tests/test-installer-framework.sh"
+"${PROJECT_ROOT}/tests/test-installer-config.sh"
 
 echo
 echo "============================================"

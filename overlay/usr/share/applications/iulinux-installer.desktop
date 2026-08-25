@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install IULinux
+GenericName=System Installer
+Comment=Install IULinux onto this computer
+Exec=sudo /usr/bin/iulinux-installer
+Icon=iulinux
+Terminal=false
+StartupNotify=true
+Categories=Qt;System;
+Keywords=installer;calamares;system;iulinux;

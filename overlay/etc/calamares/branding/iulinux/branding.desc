@@ -1,0 +1,35 @@
+---
+componentName: iulinux
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+
+windowExpanding: normal
+windowSize: 1000px,680px
+windowPlacement: center
+
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         IULinux
+    shortProductName:    IULinux
+    version:             0.1-dev
+    shortVersion:        0.1
+    versionedName:       IULinux 0.1 Development
+    shortVersionedName:  IULinux 0.1-dev
+    bootloaderEntryName: IULinux
+
+images:
+    productIcon:         "icon.png"
+    productLogo:         "logo.png"
+    productWelcome:      "welcome.png"
+
+style:
+    SidebarBackground:        "#111820"
+    SidebarText:              "#E8EDF4"
+    SidebarBackgroundCurrent: "#0867D8"
+    SidebarTextCurrent:       "#FFFFFF"
+
+uploadServer:
+    type: none
