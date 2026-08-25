@@ -38,6 +38,8 @@ done
 for package in \
     calamares \
     squashfs-tools \
+    rsync \
+    rsync \
     grub-pc-bin \
     grub-efi-amd64-bin \
     efibootmgr
@@ -108,5 +110,11 @@ grep -qF 'rm -f /usr/bin/iulinux-installer-prompt' "${CLEANUP}" ||
 
 grep -qF 'rm -f /etc/xdg/autostart/iulinux-installer-prompt.desktop' "${CLEANUP}" ||
     fail "Installed-system autostart cleanup missing"
+
+grep -q 'shellprocess@kernel_copy' "${SETTINGS}" ||
+    fail "Installed kernel copy stage missing"
+
+[[ -s "${ROOTFS_DIR}/etc/calamares/modules/shellprocess_kernel_copy.conf" ]] ||
+    fail "Kernel copy configuration missing"
 
 echo "[PASS] IULinux Calamares configuration"
