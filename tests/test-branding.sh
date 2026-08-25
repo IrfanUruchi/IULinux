@@ -108,4 +108,15 @@ do
         fail "IULinux ${resolution} wallpaper is empty"
 done
 
+for resolution in     3840x2160     2560x1440     1920x1080
+do
+    image="${ROOTFS_DIR}/usr/share/wallpapers/IULinux/contents/images/${resolution}.png"
+
+    [[ -f "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper missing"
+
+    [[ -s "${image}" ]] ||
+        fail "IULinux ${resolution} wallpaper is empty"
+done
+
 echo "[PASS] IULinux branding infrastructure"
