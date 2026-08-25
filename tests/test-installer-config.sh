@@ -117,4 +117,10 @@ grep -q 'shellprocess@kernel_copy' "${SETTINGS}" ||
 [[ -s "${ROOTFS_DIR}/etc/calamares/modules/shellprocess_kernel_copy.conf" ]] ||
     fail "Kernel copy configuration missing"
 
+[[ -x "${ROOTFS_DIR}/usr/libexec/iulinux-install-kernel" ]] ||
+    fail "IULinux installed-kernel helper missing"
+
+grep -qF '/usr/libexec/iulinux-install-kernel'     "${ROOTFS_DIR}/etc/calamares/modules/shellprocess_kernel_copy.conf" ||
+    fail "Kernel-copy job does not use IULinux helper"
+
 echo "[PASS] IULinux Calamares configuration"

@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+KVER="$(
+    find /lib/modules \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        -printf '%f\n' |
+    sort -V |
+    tail -1
+)"
+
+[[ -n "${KVER}" ]] || {
+    echo "IULinux: unable to determine kernel version" >&2
+    exit 1
+}
+
+install -Dm0644 \
+    /cdrom/casper/vmlinuz \
+    "/boot/vmlinuz-${KVER}"
+
+install -Dm0644 \
+    /cdrom/casper/initrd \
+    "/boot/initrd.img-${KVER}"
+
+echo "IULinux: installed kernel ${KVER}"
