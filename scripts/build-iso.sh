@@ -119,6 +119,18 @@ cat > "${ISO_ROOT}/.disk/info" <<INFO
 IULinux ${IULINUX_VERSION} ${TARGET_ARCH} Development Live
 INFO
 
+echo "[IULinux] Verifying rootfs mount hygiene..."
+
+for pseudo in proc sys dev run; do
+    if mountpoint -q "${ROOTFS_DIR}/${pseudo}"; then
+        echo "[IULinux] ERROR: ${ROOTFS_DIR}/${pseudo} is still mounted." >&2
+        echo "[IULinux] Refusing to package live host pseudo-filesystems." >&2
+        exit 1
+    fi
+done
+
+echo "[IULinux] Rootfs mount hygiene OK."
+
 echo "[IULinux] Building Zstd SquashFS..."
 
 sudo mksquashfs \
