@@ -13,7 +13,7 @@ if kdialog \
     --yes-label "Install IULinux" \
     --no-label "Try IULinux"
 then
-    exec sudo /usr/bin/iulinux-installer
+    exec sudo -E /usr/bin/iulinux-installer
 fi
 
 exit 0

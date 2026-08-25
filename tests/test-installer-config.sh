@@ -88,7 +88,7 @@ grep -qx 'Name=Install IULinux' "${DESKTOP}" ||
 grep -qx 'Icon=iulinux' "${DESKTOP}" ||
     fail "Installer does not use IULinux icon"
 
-grep -qx 'Exec=sudo /usr/bin/iulinux-installer' "${DESKTOP}" ||
+grep -qx 'Exec=sudo -E /usr/bin/iulinux-installer' "${DESKTOP}" ||
     fail "Installer desktop entry does not invoke IULinux launcher"
 
 [[ -x "${LAUNCHER}" ]] ||
