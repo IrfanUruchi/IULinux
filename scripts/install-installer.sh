@@ -70,6 +70,11 @@ echo "[IULinux] Installing Calamares framework..."
         "${PACKAGES[@]}"
 
 echo
+echo "[IULinux] Removing generic Calamares launcher..."
+
+"${CHROOT_RUN}" rm -f     /usr/share/applications/calamares.desktop
+
+echo
 echo "[IULinux] Cleaning package cache..."
 "${CHROOT_RUN}" apt-get clean
 
