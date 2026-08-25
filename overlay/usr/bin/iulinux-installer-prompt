@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -u
+
+# Give Plasma a moment to finish settling.
+sleep 2
+
+# This prompt only makes sense on the live image.
+[[ -x /usr/bin/calamares ]] || exit 0
+
+if kdialog \
+    --title "Welcome to IULinux" \
+    --yesno "Would you like to install IULinux now, or continue using the live environment?" \
+    --yes-label "Install IULinux" \
+    --no-label "Try IULinux"
+then
+    exec sudo /usr/bin/iulinux-installer
+fi
+
+exit 0

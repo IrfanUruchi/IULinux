@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Welcome to IULinux
+Comment=Choose whether to try or install IULinux
+Exec=/usr/bin/iulinux-installer-prompt
+Icon=iulinux
+Terminal=false
+OnlyShowIn=KDE;
+StartupNotify=false

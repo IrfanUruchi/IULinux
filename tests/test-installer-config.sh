@@ -17,6 +17,8 @@ PARTITION="${ROOTFS_DIR}/etc/calamares/modules/partition.conf"
 CLEANUP="${ROOTFS_DIR}/etc/calamares/modules/shellprocess_target_cleanup.conf"
 DESKTOP="${ROOTFS_DIR}/usr/share/applications/iulinux-installer.desktop"
 LAUNCHER="${ROOTFS_DIR}/usr/bin/iulinux-installer"
+PROMPT="${ROOTFS_DIR}/usr/bin/iulinux-installer-prompt"
+AUTOSTART="${ROOTFS_DIR}/etc/xdg/autostart/iulinux-installer-prompt.desktop"
 
 for file in \
     "${SETTINGS}" \
@@ -25,7 +27,9 @@ for file in \
     "${PARTITION}" \
     "${CLEANUP}" \
     "${DESKTOP}" \
-    "${LAUNCHER}"
+    "${LAUNCHER}" \
+    "${PROMPT}" \
+    "${AUTOSTART}"
 do
     [[ -s "${file}" ]] ||
         fail "Installer configuration missing: ${file}"
@@ -92,5 +96,17 @@ grep -qx 'Exec=sudo /usr/bin/iulinux-installer' "${DESKTOP}" ||
 
 grep -qF 'exec /usr/bin/calamares -D8' "${LAUNCHER}" ||
     fail "IULinux installer launcher does not start Calamares"
+
+[[ -x "${PROMPT}" ]] ||
+    fail "IULinux live installer prompt is not executable"
+
+grep -qx 'Exec=/usr/bin/iulinux-installer-prompt' "${AUTOSTART}" ||
+    fail "IULinux installer prompt is not configured for live autostart"
+
+grep -qF 'rm -f /usr/bin/iulinux-installer-prompt' "${CLEANUP}" ||
+    fail "Installed-system prompt cleanup missing"
+
+grep -qF 'rm -f /etc/xdg/autostart/iulinux-installer-prompt.desktop' "${CLEANUP}" ||
+    fail "Installed-system autostart cleanup missing"
 
 echo "[PASS] IULinux Calamares configuration"
