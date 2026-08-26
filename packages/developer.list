@@ -1,0 +1,31 @@
+# IULinux developer workstation foundation
+
+# Version control
+git
+git-lfs
+
+# GNU toolchain
+build-essential
+gdb
+
+# LLVM toolchain
+clang
+lld
+lldb
+
+# Build systems
+cmake
+ninja-build
+meson
+pkg-config
+ccache
+
+# Python development
+python3-dev
+python3-venv
+python3-pip
+
+# Developer utilities
+jq
+ripgrep
+strace
