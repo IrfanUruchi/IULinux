@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODE="${1:---check}"
+
+has_nvidia_gpu()
+{
+    lspci -Dn 2>/dev/null |
+        awk '
+            $2 ~ /^(0300|0302|0380):/ &&
+            $3 ~ /^10de:/ {
+                found=1
+            }
+            END { exit !found }
+        '
+}
+
+case "${MODE}" in
+    --check)
+        echo "============================================"
+        echo " IULinux NVIDIA container check"
+        echo "============================================"
+
+        if ! has_nvidia_gpu; then
+            echo "[INFO] No NVIDIA GPU detected."
+            echo "[INFO] NVIDIA Container Toolkit is not required."
+            exit 0
+        fi
+
+        echo "[PASS] NVIDIA GPU detected"
+
+        command -v docker >/dev/null 2>&1 \
+            && echo "[PASS] Docker available" \
+            || echo "[FAIL] Docker missing"
+
+        command -v nvidia-smi >/dev/null 2>&1 \
+            && echo "[PASS] NVIDIA driver available" \
+            || echo "[INFO] NVIDIA driver not installed/loaded"
+
+        command -v nvidia-ctk >/dev/null 2>&1 \
+            && echo "[PASS] NVIDIA Container Toolkit available" \
+            || {
+                echo "[INFO] NVIDIA Container Toolkit not installed."
+                echo "Run:"
+                echo "  sudo iulinux-nvidia-container-setup --install"
+            }
+        ;;
+
+    --install)
+        [[ "${EUID}" -eq 0 ]] || {
+            echo "[FAIL] Run as root:" >&2
+            echo "  sudo iulinux-nvidia-container-setup --install" >&2
+            exit 2
+        }
+
+        has_nvidia_gpu || {
+            echo "[FAIL] No NVIDIA GPU detected." >&2
+            echo "[FAIL] Refusing NVIDIA container installation." >&2
+            exit 3
+        }
+
+        command -v docker >/dev/null 2>&1 || {
+            echo "[FAIL] Docker is not installed." >&2
+            exit 4
+        }
+
+        command -v nvidia-smi >/dev/null 2>&1 || {
+            echo "[FAIL] NVIDIA driver is not installed." >&2
+            echo "Run first:" >&2
+            echo "  sudo iulinux-nvidia-setup --install" >&2
+            exit 5
+        }
+
+        echo "============================================"
+        echo " IULinux NVIDIA Container Toolkit"
+        echo "============================================"
+
+        apt-get update
+        apt-get install -y --no-install-recommends \
+            ca-certificates \
+            curl \
+            gnupg2
+
+        install -d -m 0755 /usr/share/keyrings
+
+        TMP_KEY="$(mktemp)"
+        trap 'rm -f "${TMP_KEY}"' EXIT
+
+        curl -fsSL \
+            https://nvidia.github.io/libnvidia-container/gpgkey \
+            -o "${TMP_KEY}"
+
+        gpg --dearmor --yes \
+            -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+            "${TMP_KEY}"
+
+        curl -fsSL \
+            https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list |
+        sed \
+            's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+            > /etc/apt/sources.list.d/nvidia-container-toolkit.list
+
+        apt-get update
+
+        echo
+        echo "[IULinux] Installing NVIDIA Container Toolkit..."
+
+        apt-get install -y \
+            nvidia-container-toolkit
+
+        echo
+        echo "[IULinux] Configuring Docker NVIDIA runtime..."
+
+        nvidia-ctk runtime configure --runtime=docker
+
+        systemctl restart docker
+
+        echo
+        echo "=== NVIDIA CONTAINER TOOLKIT ==="
+        nvidia-ctk --version
+
+        echo
+        echo "=== DOCKER RUNTIMES ==="
+        docker info --format '{{json .Runtimes}}'
+
+        echo
+        echo "============================================"
+        echo " NVIDIA CONTAINER SUPPORT COMPLETE"
+        echo "============================================"
+        echo
+        echo "NVIDIA GPUs can now be exposed with:"
+        echo "  docker run --gpus all ..."
+        ;;
+
+    *)
+        echo "Usage:"
+        echo "  iulinux-nvidia-container-setup --check"
+        echo "  sudo iulinux-nvidia-container-setup --install"
+        exit 2
+        ;;
+esac
