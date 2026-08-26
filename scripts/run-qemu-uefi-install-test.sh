@@ -97,7 +97,7 @@ case "${MODE}" in
         exec qemu-system-x86_64 \
             "${COMMON[@]}" \
             -cdrom "${ISO}" \
-            -boot order=d,menu=on
+            -boot order=c,once=d,menu=on
         ;;
 
     disk)

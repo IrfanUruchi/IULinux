@@ -65,7 +65,7 @@ grep -qF 'menuentry "Start IULinux"' "${GRUB_CONFIG}" ||
     fail "Normal IULinux boot entry missing"
 
 grep -qF \
-    'linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live noprompt ---' \
+    'linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live ---' \
     "${GRUB_CONFIG}" ||
     fail "Normal Casper boot policy changed"
 
@@ -73,7 +73,7 @@ grep -qF 'menuentry "Start IULinux (safe graphics)"' "${GRUB_CONFIG}" ||
     fail "Safe-graphics boot entry missing"
 
 grep -qF \
-    'linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live noprompt nomodeset ---' \
+    'linux /casper/vmlinuz boot=casper username=iulinux hostname=iulinux-live nomodeset ---' \
     "${GRUB_CONFIG}" ||
     fail "Safe-graphics Casper policy changed"
 
