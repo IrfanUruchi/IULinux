@@ -82,6 +82,10 @@ command -v desktopeditors >/dev/null \
     && pass "ONLYOFFICE available" \
     || fail "ONLYOFFICE missing"
 
+command -v plasma-systemmonitor >/dev/null \
+    && pass "System Monitor available" \
+    || fail "System Monitor missing"
+
 if [[ -d /sys/firmware/efi ]]; then
     pass "Boot mode: UEFI"
 

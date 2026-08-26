@@ -22,6 +22,7 @@ pipewire-pulse
 plasma-desktop
 plasma-nm
 plasma-pa
+plasma-systemmonitor
 plasma-session-wayland
 # Plasma shell / workspace
 plasma-workspace
