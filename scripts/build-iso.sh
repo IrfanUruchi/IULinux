@@ -54,6 +54,7 @@ done
 "${PROJECT_ROOT}/tests/test-gpu-base.sh"
 "${PROJECT_ROOT}/tests/test-nvidia-policy.sh"
 "${PROJECT_ROOT}/tests/test-nvidia-container-policy.sh"
+"${PROJECT_ROOT}/tests/test-cuda-policy.sh"
 "${PROJECT_ROOT}/tests/test-lean-profile.sh"
 "${PROJECT_ROOT}/tests/test-live-system.sh"
 "${PROJECT_ROOT}/tests/test-network-policy.sh"
