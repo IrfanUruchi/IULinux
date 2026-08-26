@@ -35,6 +35,9 @@ COMMON=(
     -m 4096
     -smp 4
     -device virtio-vga
+    -audiodev pipewire,id=audio0
+    -device ich9-intel-hda
+    -device hda-duplex,audiodev=audio0
 
     -drive "file=${DISK},format=qcow2,if=virtio,cache=writeback"
 

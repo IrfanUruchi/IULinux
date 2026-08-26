@@ -52,6 +52,9 @@ COMMON=(
     -m 4096
     -smp 4
     -device virtio-vga
+    -audiodev pipewire,id=audio0
+    -device ich9-intel-hda
+    -device hda-duplex,audiodev=audio0
 
     -drive "if=pflash,format=raw,readonly=on,file=${OVMF_CODE}"
     -drive "if=pflash,format=raw,file=${VARS}"
