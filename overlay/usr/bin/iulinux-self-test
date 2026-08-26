@@ -86,6 +86,26 @@ command -v plasma-systemmonitor >/dev/null \
     && pass "System Monitor available" \
     || fail "System Monitor missing"
 
+command -v docker >/dev/null \
+    && pass "Docker CLI available" \
+    || fail "Docker CLI missing"
+
+docker compose version >/dev/null 2>&1 \
+    && pass "Docker Compose available" \
+    || fail "Docker Compose missing"
+
+docker buildx version >/dev/null 2>&1 \
+    && pass "Docker Buildx available" \
+    || fail "Docker Buildx missing"
+
+systemctl is-enabled --quiet docker \
+    && pass "Docker service enabled" \
+    || fail "Docker service not enabled"
+
+systemctl is-active --quiet docker \
+    && pass "Docker service active" \
+    || fail "Docker service not active"
+
 if [[ -d /sys/firmware/efi ]]; then
     pass "Boot mode: UEFI"
 
