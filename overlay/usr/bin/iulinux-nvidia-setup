@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODE="${1:---check}"
+
+has_nvidia_gpu()
+{
+    lspci -Dn 2>/dev/null |
+        awk '
+            $2 ~ /^(0300|0302|0380):/ &&
+            $3 ~ /^10de:/ {
+                found=1
+            }
+            END { exit !found }
+        '
+}
+
+show_gpu()
+{
+    lspci -nn 2>/dev/null |
+        grep -Ei 'VGA compatible controller|3D controller|Display controller' |
+        grep -i NVIDIA || true
+}
+
+case "${MODE}" in
+    --check)
+        echo "============================================"
+        echo " IULinux NVIDIA hardware check"
+        echo "============================================"
+
+        if has_nvidia_gpu; then
+            echo "[PASS] NVIDIA GPU detected"
+            show_gpu
+
+            if command -v nvidia-smi >/dev/null 2>&1; then
+                echo
+                echo "[INFO] NVIDIA userspace tools already installed."
+                nvidia-smi || true
+            else
+                echo
+                echo "[INFO] NVIDIA driver is not installed."
+                echo "Run:"
+                echo "  sudo iulinux-nvidia-setup --install"
+            fi
+        else
+            echo "[INFO] No NVIDIA GPU detected."
+            echo "[INFO] No NVIDIA packages will be installed."
+        fi
+        ;;
+
+    --install)
+        if ! has_nvidia_gpu; then
+            echo "[FAIL] No NVIDIA GPU detected." >&2
+            echo "[FAIL] Refusing to install NVIDIA drivers." >&2
+            exit 3
+        fi
+
+        [[ "${EUID}" -eq 0 ]] || {
+            echo "[FAIL] Installation requires root." >&2
+            echo "Run: sudo iulinux-nvidia-setup --install" >&2
+            exit 4
+        }
+
+        echo "============================================"
+        echo " IULinux NVIDIA driver setup"
+        echo "============================================"
+
+        show_gpu
+        echo
+
+        apt-get update
+
+        apt-get install -y \
+            ubuntu-drivers-common \
+            linux-headers-generic \
+            mokutil
+
+        echo
+        echo "=== SECURE BOOT ==="
+        mokutil --sb-state 2>/dev/null || true
+
+        echo
+        echo "=== UBUNTU DRIVER RECOMMENDATION ==="
+        ubuntu-drivers devices
+
+        echo
+        echo "[IULinux] Installing Ubuntu-recommended NVIDIA driver..."
+        ubuntu-drivers install
+
+        echo
+        echo "============================================"
+        echo " NVIDIA DRIVER INSTALLATION COMPLETE"
+        echo "============================================"
+        echo
+        echo "Reboot IULinux, then validate with:"
+        echo "  nvidia-smi"
+        ;;
+
+    *)
+        echo "Usage:"
+        echo "  iulinux-nvidia-setup --check"
+        echo "  sudo iulinux-nvidia-setup --install"
+        exit 2
+        ;;
+esac
