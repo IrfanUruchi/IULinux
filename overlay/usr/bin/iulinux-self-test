@@ -114,6 +114,18 @@ command -v iulinux-ai-init >/dev/null \
     && pass "AI workspace utility available" \
     || fail "AI workspace utility missing"
 
+command -v llama-cli >/dev/null \
+    && pass "llama.cpp CLI available" \
+    || fail "llama.cpp CLI missing"
+
+command -v llama-server >/dev/null \
+    && pass "llama.cpp server available" \
+    || fail "llama.cpp server missing"
+
+command -v iulinux-ai-info >/dev/null \
+    && pass "AI runtime information utility available" \
+    || fail "AI runtime information utility missing"
+
 if [[ -d /sys/firmware/efi ]]; then
     pass "Boot mode: UEFI"
 

@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -u
+
+echo "============================================"
+echo " IULinux AI Runtime"
+echo "============================================"
+
+CPU="$(
+    lscpu 2>/dev/null |
+    awk -F: '/Model name/ {
+        sub(/^[ \t]+/, "", $2)
+        print $2
+        exit
+    }'
+)"
+
+RAM="$(free -h 2>/dev/null | awk '/^Mem:/ {print $2}')"
+
+LLAMA="$(
+    dpkg-query -W -f='${Version}' llama.cpp 2>/dev/null ||
+    echo "not installed"
+)"
+
+OPENBLAS="$(
+    dpkg-query -W -f='${Version}' libopenblas0 2>/dev/null ||
+    echo "not installed"
+)"
+
+printf "%-12s %s\n" "CPU:" "${CPU:-unknown}"
+printf "%-12s %s\n" "RAM:" "${RAM:-unknown}"
+printf "%-12s %s\n" "llama.cpp:" "${LLAMA}"
+printf "%-12s %s\n" "OpenBLAS:" "${OPENBLAS}"
+
+echo
+
+if dpkg-query -W -f='${db:Status-Abbrev}' \
+    libggml0-backend-blas 2>/dev/null |
+    grep -q '^ii '
+then
+    echo "[PASS] GGML BLAS backend available"
+else
+    echo "[FAIL] GGML BLAS backend unavailable"
+fi
+
+VULKAN_OK=0
+
+if dpkg-query -W -f='${db:Status-Abbrev}' \
+    libggml0-backend-vulkan 2>/dev/null |
+    grep -q '^ii '
+then
+    echo "[PASS] GGML Vulkan backend installed"
+
+    if command -v vulkaninfo >/dev/null 2>&1 &&
+       vulkaninfo --summary >/tmp/iulinux-vulkan.$$ 2>/dev/null
+    then
+        if grep -q 'deviceName' /tmp/iulinux-vulkan.$$; then
+            VULKAN_OK=1
+            echo "[PASS] Vulkan device available"
+
+            grep 'deviceName' /tmp/iulinux-vulkan.$$ |
+                sed 's/^[[:space:]]*/       /'
+        else
+            echo "[INFO] No usable Vulkan GPU detected"
+        fi
+    else
+        echo "[INFO] Vulkan runtime could not enumerate a GPU"
+    fi
+else
+    echo "[INFO] GGML Vulkan backend unavailable"
+fi
+
+rm -f /tmp/iulinux-vulkan.$$ 2>/dev/null || true
+
+echo
+
+if lspci -Dn 2>/dev/null | grep -Eq \
+    ' (0300|0302|0380): 10de:'
+then
+    echo "[INFO] NVIDIA hardware detected"
+
+    if command -v nvidia-smi >/dev/null 2>&1; then
+        echo "[PASS] NVIDIA driver available"
+    else
+        echo "[INFO] NVIDIA driver not installed/loaded"
+    fi
+
+    if command -v nvcc >/dev/null 2>&1; then
+        echo "[PASS] Host CUDA toolkit available"
+    fi
+fi
+
+echo
+if (( VULKAN_OK )); then
+    echo "Recommended packaged llama.cpp backend: Vulkan"
+else
+    echo "Recommended packaged llama.cpp backend: CPU / BLAS"
+fi

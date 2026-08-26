@@ -1,0 +1,8 @@
+# IULinux native local-AI runtime
+
+# llama.cpp command-line and server runtime
+llama.cpp
+
+# Portable acceleration backends
+libggml0-backend-blas
+libggml0-backend-vulkan

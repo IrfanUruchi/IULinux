@@ -53,6 +53,7 @@ done
 "${PROJECT_ROOT}/tests/test-containers.sh"
 "${PROJECT_ROOT}/tests/test-gpu-base.sh"
 "${PROJECT_ROOT}/tests/test-ai-foundation.sh"
+"${PROJECT_ROOT}/tests/test-ai-runtime.sh"
 "${PROJECT_ROOT}/tests/test-nvidia-policy.sh"
 "${PROJECT_ROOT}/tests/test-nvidia-container-policy.sh"
 "${PROJECT_ROOT}/tests/test-cuda-policy.sh"
