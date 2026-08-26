@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+set -u
+
+FAILURES=0
+
+pass() { printf '[PASS] %s\n' "$*"; }
+fail() { printf '[FAIL] %s\n' "$*"; FAILURES=$((FAILURES + 1)); }
+
+echo "============================================"
+echo " IULinux installed-system self-test"
+echo "============================================"
+
+grep -q '^ID=iulinux$' /etc/os-release \
+    && pass "IULinux operating-system identity" \
+    || fail "IULinux operating-system identity"
+
+ROOT_SOURCE="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+ROOT_FS="$(findmnt -n -o FSTYPE / 2>/dev/null || true)"
+
+[[ -n "${ROOT_SOURCE}" ]] \
+    && pass "Root filesystem: ${ROOT_SOURCE} (${ROOT_FS})" \
+    || fail "Root filesystem"
+
+[[ "$(systemctl get-default 2>/dev/null)" == "graphical.target" ]] \
+    && pass "Default boot target: graphical.target" \
+    || fail "Default boot target"
+
+systemctl is-enabled --quiet sddm \
+    && pass "SDDM enabled" \
+    || fail "SDDM enabled"
+
+systemctl is-active --quiet sddm \
+    && pass "SDDM active" \
+    || fail "SDDM active"
+
+systemctl is-enabled --quiet NetworkManager \
+    && pass "NetworkManager enabled" \
+    || fail "NetworkManager enabled"
+
+systemctl is-active --quiet NetworkManager \
+    && pass "NetworkManager active" \
+    || fail "NetworkManager active"
+
+FAILED_UNITS="$(
+    systemctl --failed --no-legend --no-pager 2>/dev/null |
+    sed '/^[[:space:]]*$/d' |
+    wc -l
+)"
+
+[[ "${FAILED_UNITS}" -eq 0 ]] \
+    && pass "Zero failed systemd units" \
+    || fail "${FAILED_UNITS} failed systemd unit(s)"
+
+[[ ! -e /etc/sddm.conf.d/iulinux-live.conf ]] \
+    && pass "Live SDDM configuration removed" \
+    || fail "Live SDDM configuration remains"
+
+[[ ! -e /usr/bin/iulinux-installer ]] \
+    && pass "Live installer launcher removed" \
+    || fail "Live installer launcher remains"
+
+[[ ! -e /etc/xdg/autostart/iulinux-installer-prompt.desktop ]] \
+    && pass "Live installer prompt removed" \
+    || fail "Live installer prompt remains"
+
+for pkg in calamares calamares-data casper; do
+    status="$(
+        dpkg-query -W -f='${db:Status-Abbrev}' "${pkg}" 2>/dev/null ||
+        true
+    )"
+
+    [[ "${status}" != "ii " ]] \
+        && pass "${pkg} removed from installed system" \
+        || fail "${pkg} remains installed"
+done
+
+command -v brave-browser >/dev/null \
+    && pass "Brave available" \
+    || fail "Brave missing"
+
+command -v desktopeditors >/dev/null \
+    && pass "ONLYOFFICE available" \
+    || fail "ONLYOFFICE missing"
+
+if [[ -d /sys/firmware/efi ]]; then
+    pass "Boot mode: UEFI"
+
+    findmnt -n /boot/efi >/dev/null 2>&1 \
+        && pass "EFI System Partition mounted" \
+        || fail "EFI System Partition not mounted"
+else
+    pass "Boot mode: legacy BIOS"
+fi
+
+if [[ -n "${XDG_SESSION_TYPE:-}" ]]; then
+    pass "Desktop session: ${XDG_SESSION_TYPE}"
+fi
+
+echo
+if (( FAILURES == 0 )); then
+    echo "============================================"
+    echo " IULinux self-test: ALL PASSED"
+    echo "============================================"
+    exit 0
+else
+    echo "============================================"
+    echo " IULinux self-test: ${FAILURES} FAILURE(S)"
+    echo "============================================"
+    exit 1
+fi
