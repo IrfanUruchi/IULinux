@@ -106,6 +106,14 @@ systemctl is-active --quiet docker \
     && pass "Docker service active" \
     || fail "Docker service not active"
 
+command -v pipx >/dev/null \
+    && pass "pipx available" \
+    || fail "pipx missing"
+
+command -v iulinux-ai-init >/dev/null \
+    && pass "AI workspace utility available" \
+    || fail "AI workspace utility missing"
+
 if [[ -d /sys/firmware/efi ]]; then
     pass "Boot mode: UEFI"
 

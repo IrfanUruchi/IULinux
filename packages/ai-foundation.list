@@ -1,0 +1,17 @@
+# IULinux AI workstation foundation
+
+# Isolated Python CLI/application environments
+pipx
+
+# CPU inference / numerical acceleration
+libopenblas-dev
+libgomp1
+
+# Native model/runtime build dependencies
+libcurl4-openssl-dev
+libssl-dev
+
+# NUMA and hardware-topology awareness
+libnuma-dev
+numactl
+hwloc
