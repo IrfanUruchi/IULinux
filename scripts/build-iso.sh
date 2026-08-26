@@ -51,6 +51,7 @@ done
 "${PROJECT_ROOT}/tests/test-desktop.sh"
 "${PROJECT_ROOT}/tests/test-developer.sh"
 "${PROJECT_ROOT}/tests/test-containers.sh"
+"${PROJECT_ROOT}/tests/test-gpu-base.sh"
 "${PROJECT_ROOT}/tests/test-lean-profile.sh"
 "${PROJECT_ROOT}/tests/test-live-system.sh"
 "${PROJECT_ROOT}/tests/test-network-policy.sh"

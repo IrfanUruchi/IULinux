@@ -12,6 +12,7 @@ STAGES=(
     install-desktop.sh
     install-developer.sh
     install-containers.sh
+    install-gpu-base.sh
     install-brave.sh
     install-onlyoffice.sh
     install-live-system.sh
@@ -90,6 +91,7 @@ run_stage install-base-system.sh
 run_stage install-desktop.sh
 run_stage install-developer.sh
 run_stage install-containers.sh
+run_stage install-gpu-base.sh
 run_stage install-brave.sh
 run_stage install-onlyoffice.sh
 run_stage install-live-system.sh

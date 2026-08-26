@@ -1,0 +1,10 @@
+# IULinux generic graphics / GPU foundation
+
+# OpenGL / Mesa
+libgl1-mesa-dri
+mesa-utils
+
+# Vulkan
+libvulkan1
+mesa-vulkan-drivers
+vulkan-tools
