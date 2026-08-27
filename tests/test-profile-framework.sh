@@ -126,3 +126,23 @@ grep -Fq 'chmod 0644 {} +' \
 echo "[PASS] IULinux profile state permission policy"
 
 echo "[PASS] IULinux profile provenance policy"
+
+[[ -x "${ROOTFS}/usr/lib/iulinux/profile-remove" ]] ||
+    fail "profile removal engine missing"
+
+bash -n "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "profile removal engine syntax"
+
+grep -q 'remove --no-auto-remove' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "package removal safety gate missing"
+
+grep -q 'Modified profile file preserved' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "modified-file preservation missing"
+
+grep -q 'Provenance archived' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "removal provenance archive missing"
+
+echo "[PASS] IULinux safe profile removal policy"
