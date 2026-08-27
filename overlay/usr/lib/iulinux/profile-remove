@@ -146,3 +146,25 @@ echo "Overlay files unchanged:     ${unchanged_files}"
 echo "Overlay files modified:      ${modified_files}"
 echo "Overlay files already absent:${missing_files}"
 echo "[PASS] Overlay removal safety simulation"
+
+# Apply profile-specific shutdown policy before package removal.
+if [[ -x "${profile}/pre-remove" ]]; then
+    echo
+    echo "[IULinux] Applying profile removal policy..."
+    "${profile}/pre-remove"
+fi
+
+# Remove only explicit packages that this profile owns.
+# Dependencies are deliberately left alone for now.
+if (( ${#installed_owned[@]} )); then
+    echo
+    echo "[IULinux] Removing profile-owned explicit packages..."
+
+    LC_ALL=C apt-get remove -y --no-auto-remove \
+        "${installed_owned[@]}"
+else
+    echo "[INFO] No profile-owned explicit packages remain installed."
+fi
+
+echo "[PASS] Explicit profile packages removed safely"
+echo "[INFO] Dependency autoremove intentionally disabled"
