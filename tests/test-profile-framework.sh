@@ -147,7 +147,7 @@ grep -q 'Provenance archived' \
 
 echo "[PASS] IULinux safe profile removal policy"
 
-grep -q 'Autoremove would remove package not introduced by profile' \
+grep -q 'Dependency cleanup would remove package not introduced by profile' \
     "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
     fail "dependency autoremove safety gate missing"
 
