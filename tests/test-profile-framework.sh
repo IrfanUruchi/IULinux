@@ -115,4 +115,14 @@ grep -q 'check_overlay_collisions' \
     "${ROOTFS}/usr/bin/iulinux-profile" ||
     fail "overlay collision protection missing"
 
+grep -Fq 'chmod 0755 "${final_state}"' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "profile state directory readability policy missing"
+
+grep -Fq 'chmod 0644 {} +' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "profile state file readability policy missing"
+
+echo "[PASS] IULinux profile state permission policy"
+
 echo "[PASS] IULinux profile provenance policy"

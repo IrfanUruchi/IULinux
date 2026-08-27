@@ -309,6 +309,11 @@ install_profile()
     final_state="$(profile_state_path)"
     mv "${tmp_state}" "${final_state}"
 
+    # Profile state is system metadata, not secret data.
+    # Normal users must be able to inspect profile installation status.
+    chmod 0755 "${final_state}"
+    find "${final_state}" -maxdepth 1 -type f -exec chmod 0644 {} +
+
     trap - EXIT
 
     echo
