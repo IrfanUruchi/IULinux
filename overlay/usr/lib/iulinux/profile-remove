@@ -182,16 +182,38 @@ else
 fi
 
 echo "[PASS] Explicit profile packages removed safely"
-# Remove unused dependencies only when every APT candidate
-# was introduced by this exact profile installation.
+# Remove only unused dependencies introduced by this profile.
 simulation="$(LC_ALL=C apt-get -s autoremove)"
 
 mapfile -t autoremove_candidates < <(
     awk '/^Remv / {print $2}' <<<"${simulation}"
 )
 
-if (( ${#autoremove_candidates[@]} )); then
-    for planned in "${autoremove_candidates[@]}"; do
+safe_candidates=()
+
+for planned in "${autoremove_candidates[@]}"; do
+    planned_base="$(basepkg "${planned}")"
+
+    while IFS= read -r added_pkg; do
+        [[ -n "${added_pkg}" ]] || continue
+
+        if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+            safe_candidates+=("${planned}")
+            break
+        fi
+    done < "${added}"
+done
+
+if (( ${#safe_candidates[@]} )); then
+    echo "[PASS] Profile-owned unused dependencies identified: ${#safe_candidates[@]}"
+
+    cleanup_sim="$(
+        LC_ALL=C apt-get -s remove --no-auto-remove \
+            "${safe_candidates[@]}"
+    )"
+
+    while IFS= read -r planned; do
+        [[ -n "${planned}" ]] || continue
         planned_base="$(basepkg "${planned}")"
         allowed=0
 
@@ -205,14 +227,17 @@ if (( ${#autoremove_candidates[@]} )); then
         done < "${added}"
 
         (( allowed == 1 )) ||
-            fail "Autoremove would remove package not introduced by profile: ${planned}"
-    done
+            fail "Dependency cleanup would remove package not introduced by profile: ${planned}"
+    done < <(
+        awk '/^Remv / {print $2}' <<<"${cleanup_sim}"
+    )
 
-    echo "[PASS] Dependency autoremove safety gate"
+    echo "[PASS] Dependency cleanup safety gate"
 
-    LC_ALL=C apt-get autoremove -y
+    LC_ALL=C apt-get remove -y --no-auto-remove \
+        "${safe_candidates[@]}"
 else
-    echo "[INFO] No unused profile dependencies require cleanup."
+    echo "[INFO] No unused profile-added dependencies require cleanup."
 fi
 
 # Remove profile overlay files only if they are byte-for-byte unchanged.
