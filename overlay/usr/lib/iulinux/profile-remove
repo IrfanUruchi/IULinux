@@ -32,9 +32,13 @@ state="${STATE_DIR}/${id}"
 source "${profile}/profile.conf"
 
 owned="${state}/packages-owned-explicit"
+added="${state}/packages-added"
 
 [[ -f "${owned}" ]] ||
     fail "Explicit package provenance missing."
+
+[[ -f "${added}" ]] ||
+    fail "Added-package provenance missing."
 
 basepkg()
 {
@@ -83,8 +87,19 @@ if (( ${#installed_owned[@]} )); then
             fi
         done
 
+        if (( allowed == 0 )); then
+            while IFS= read -r added_pkg; do
+                [[ -n "${added_pkg}" ]] || continue
+
+                if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+                    allowed=1
+                    break
+                fi
+            done < "${added}"
+        fi
+
         (( allowed == 1 )) ||
-            fail "APT would remove non-profile package: ${planned}"
+            fail "APT would remove package not introduced by profile: ${planned}"
     done < <(
         awk '/^Remv / {print $2}' <<<"${simulation}"
     )
