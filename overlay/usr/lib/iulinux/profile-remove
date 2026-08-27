@@ -237,3 +237,28 @@ echo
 echo "============================================"
 echo " Profile removed: ${PROFILE_NAME}"
 echo "============================================"
+
+# Archive provenance instead of deleting profile history.
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+history="${STATE_DIR}/history"
+archive="${history}/${id}-${timestamp}"
+
+install -d -m 0755 "${history}"
+
+echo "REMOVED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    >> "${state}/metadata"
+
+rm -f "${state}/installed"
+mv "${state}" "${archive}"
+
+chmod 0755 "${archive}"
+find "${archive}" -maxdepth 1 -type f -exec chmod 0644 {} +
+
+echo
+echo "Provenance archived:"
+echo "  ${archive}"
+
+echo
+echo "============================================"
+echo " Profile removed: ${PROFILE_NAME}"
+echo "============================================"
