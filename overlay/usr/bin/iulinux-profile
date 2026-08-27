@@ -56,6 +56,63 @@ read_packages()
         "${file}"
 }
 
+profile_state_path()
+{
+    echo "${STATE_DIR}/${PROFILE_ID}"
+}
+
+profile_installed()
+{
+    [[ -f "$(profile_state_path)/installed" ||
+       -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]
+}
+
+package_is_installed()
+{
+    dpkg-query -W -f='${db:Status-Abbrev}' "$1" \
+        2>/dev/null |
+        grep -q '^ii '
+}
+
+snapshot_packages()
+{
+    dpkg-query -W \
+        -f='${binary:Package} ${db:Status-Abbrev}\n' \
+        2>/dev/null |
+        awk '$2 == "ii" {print $1}' |
+        sort -u
+}
+
+overlay_file_list()
+{
+    local overlay="${PROFILE_PATH}/overlay"
+
+    [[ -d "${overlay}" ]] || return 0
+
+    find "${overlay}" \
+        \( -type f -o -type l \) \
+        -printf '%P\n' |
+        sort
+}
+
+check_overlay_collisions()
+{
+    local rel target
+    local collision=0
+
+    while IFS= read -r rel; do
+        [[ -n "${rel}" ]] || continue
+        target="/${rel}"
+
+        if [[ -e "${target}" || -L "${target}" ]]; then
+            echo "[FAIL] Profile overlay collision: ${target}" >&2
+            collision=1
+        fi
+    done < <(overlay_file_list)
+
+    (( collision == 0 ))
+}
+
 list_profiles()
 {
     printf "%-14s %-10s %-11s %s\n" \
@@ -76,7 +133,7 @@ list_profiles()
         # shellcheck disable=SC1090
         source "${manifest}"
 
-        if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+        if profile_installed; then
             state="installed"
         else
             state="available"
@@ -128,8 +185,19 @@ show_status()
 {
     load_profile "$1"
 
-    if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+    if profile_installed; then
         echo "${PROFILE_ID}: installed"
+
+        state="$(profile_state_path)"
+
+        if [[ -f "${state}/packages-added" ]]; then
+            echo "Packages added: $(wc -l < "${state}/packages-added")"
+        fi
+
+        if [[ -f "${state}/overlay-files" ]]; then
+            echo "Overlay files:  $(wc -l < "${state}/overlay-files")"
+        fi
+
         exit 0
     fi
 
@@ -147,7 +215,9 @@ install_profile()
         exit 4
     }
 
-    if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+    install -d -m 0755 "${STATE_DIR}"
+
+    if profile_installed; then
         echo "[INFO] Profile already installed: ${PROFILE_ID}"
         exit 0
     fi
@@ -158,12 +228,63 @@ install_profile()
     echo " Installing IULinux profile: ${PROFILE_NAME}"
     echo "============================================"
 
+    # Refuse to overwrite anything already owned by the base system/user.
+    check_overlay_collisions || {
+        echo "[FAIL] Profile installation aborted before package changes." >&2
+        exit 5
+    }
+
+    tmp_state="$(
+        mktemp -d "${STATE_DIR}/.${PROFILE_ID}.install.XXXXXX"
+    )"
+
+    cleanup()
+    {
+        rm -rf "${tmp_state}" 2>/dev/null || true
+    }
+    trap cleanup EXIT
+
+    printf '%s\n' "${packages[@]}" \
+        > "${tmp_state}/packages-requested"
+
+    snapshot_packages \
+        > "${tmp_state}/packages-before"
+
+    : > "${tmp_state}/packages-preexisting"
+
+    for pkg in "${packages[@]}"; do
+        if package_is_installed "${pkg}"; then
+            echo "${pkg}" >> "${tmp_state}/packages-preexisting"
+        fi
+    done
+
     if (( ${#packages[@]} )); then
         apt-get update
 
         apt-get install -y --no-install-recommends \
             "${packages[@]}"
     fi
+
+    snapshot_packages \
+        > "${tmp_state}/packages-after"
+
+    comm -13 \
+        "${tmp_state}/packages-before" \
+        "${tmp_state}/packages-after" \
+        > "${tmp_state}/packages-added"
+
+    # Packages may theoretically introduce a path used by a profile overlay.
+    # Refuse to overwrite it rather than silently replacing package/user data.
+    check_overlay_collisions || {
+        echo "[FAIL] Overlay collision detected after package installation." >&2
+        echo "[FAIL] Installation state retained for inspection:" >&2
+        echo "       ${tmp_state}" >&2
+        trap - EXIT
+        exit 6
+    }
+
+    overlay_file_list \
+        > "${tmp_state}/overlay-files"
 
     if [[ -d "${PROFILE_PATH}/overlay" ]]; then
         echo
@@ -177,12 +298,30 @@ install_profile()
         "${PROFILE_PATH}/post-install"
     fi
 
-    install -d -m 0755 "${STATE_DIR}"
-
     {
         echo "PROFILE_ID=${PROFILE_ID}"
+        echo "PROFILE_NAME=${PROFILE_NAME}"
         echo "INSTALLED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    } > "${STATE_DIR}/${PROFILE_ID}.installed"
+    } > "${tmp_state}/metadata"
+
+    touch "${tmp_state}/installed"
+
+    final_state="$(profile_state_path)"
+    mv "${tmp_state}" "${final_state}"
+
+    trap - EXIT
+
+    echo
+    echo "Packages requested:     ${#packages[@]}"
+    echo "Packages pre-existing:  $(
+        wc -l < "${final_state}/packages-preexisting"
+    )"
+    echo "Packages newly added:   $(
+        wc -l < "${final_state}/packages-added"
+    )"
+    echo "Overlay files recorded: $(
+        wc -l < "${final_state}/overlay-files"
+    )"
 
     echo
     echo "============================================"

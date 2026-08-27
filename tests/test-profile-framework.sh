@@ -82,3 +82,25 @@ do
 done
 
 echo "[PASS] IULinux profile framework"
+
+grep -q 'packages-before' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "package provenance snapshot missing"
+
+grep -q 'packages-added' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "added-package provenance missing"
+
+grep -q 'packages-preexisting' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "pre-existing package provenance missing"
+
+grep -q 'overlay-files' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "overlay provenance missing"
+
+grep -q 'check_overlay_collisions' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "overlay collision protection missing"
+
+echo "[PASS] IULinux profile provenance policy"
