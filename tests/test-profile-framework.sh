@@ -36,24 +36,36 @@ bash -n "${ROOTFS}/usr/bin/iulinux-profile" ||
 bash -n "${PROFILE_ROOT}/post-install" ||
     fail "AI profile post-install syntax"
 
-"${PROJECT_ROOT}/scripts/chroot-run.sh" \
-    iulinux-profile list |
-    grep -q '^ai' ||
+list_output="$(
+    "${PROJECT_ROOT}/scripts/chroot-run.sh" \
+        iulinux-profile list
+)"
+
+grep -q '^ai' <<<"${list_output}" ||
     fail "AI profile not listed"
 
-"${PROJECT_ROOT}/scripts/chroot-run.sh" \
-    iulinux-profile info ai |
-    grep -q 'Default:     false' ||
+info_output="$(
+    "${PROJECT_ROOT}/scripts/chroot-run.sh" \
+        iulinux-profile info ai
+)"
+
+grep -q 'Default:     false' <<<"${info_output}" ||
     fail "AI profile incorrectly marked default"
 
-"${PROJECT_ROOT}/scripts/chroot-run.sh" \
-    iulinux-profile plan ai |
-    grep -q 'llama.cpp' ||
+plan_output="$(
+    "${PROJECT_ROOT}/scripts/chroot-run.sh" \
+        iulinux-profile plan ai
+)"
+
+grep -q 'llama.cpp' <<<"${plan_output}" ||
     fail "AI installation plan incomplete"
 
-"${PROJECT_ROOT}/scripts/chroot-run.sh" \
-    iulinux-profile status ai |
-    grep -q 'not installed' ||
+status_output="$(
+    "${PROJECT_ROOT}/scripts/chroot-run.sh" \
+        iulinux-profile status ai
+)"
+
+grep -q 'not installed' <<<"${status_output}" ||
     fail "AI profile unexpectedly marked installed"
 
 # Dormant profile assets must NOT become active default utilities.
