@@ -91,3 +91,58 @@ if (( ${#installed_owned[@]} )); then
 fi
 
 echo "[PASS] Explicit package removal safety simulation"
+
+hash_path()
+{
+    local path="$1"
+
+    if [[ -L "${path}" ]]; then
+        printf 'symlink:%s' "$(readlink -- "${path}")" |
+            sha256sum |
+            awk '{print $1}'
+    elif [[ -f "${path}" ]]; then
+        sha256sum "${path}" |
+            awk '{print $1}'
+    else
+        return 1
+    fi
+}
+
+hashes="${state}/overlay-sha256"
+
+[[ -f "${hashes}" ]] ||
+    fail "Overlay checksum provenance missing."
+
+unchanged_files=0
+modified_files=0
+missing_files=0
+
+while IFS=$'\t' read -r expected rel; do
+    [[ -n "${rel}" ]] || continue
+
+    [[ "${rel}" != /* ]] ||
+        fail "Unsafe absolute overlay path: ${rel}"
+
+    target="/${rel}"
+
+    if [[ ! -e "${target}" && ! -L "${target}" ]]; then
+        missing_files=$((missing_files + 1))
+        continue
+    fi
+
+    current="$(hash_path "${target}")" ||
+        fail "Unable to hash profile file: ${target}"
+
+    if [[ "${current}" == "${expected}" ]]; then
+        unchanged_files=$((unchanged_files + 1))
+    else
+        echo "[WARN] Modified profile file would be preserved: ${target}"
+        modified_files=$((modified_files + 1))
+    fi
+done < "${hashes}"
+
+echo
+echo "Overlay files unchanged:     ${unchanged_files}"
+echo "Overlay files modified:      ${modified_files}"
+echo "Overlay files already absent:${missing_files}"
+echo "[PASS] Overlay removal safety simulation"
