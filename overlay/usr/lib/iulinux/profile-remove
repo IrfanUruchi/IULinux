@@ -182,7 +182,38 @@ else
 fi
 
 echo "[PASS] Explicit profile packages removed safely"
-echo "[INFO] Dependency autoremove intentionally disabled"
+# Remove unused dependencies only when every APT candidate
+# was introduced by this exact profile installation.
+simulation="$(LC_ALL=C apt-get -s autoremove)"
+
+mapfile -t autoremove_candidates < <(
+    awk '/^Remv / {print $2}' <<<"${simulation}"
+)
+
+if (( ${#autoremove_candidates[@]} )); then
+    for planned in "${autoremove_candidates[@]}"; do
+        planned_base="$(basepkg "${planned}")"
+        allowed=0
+
+        while IFS= read -r added_pkg; do
+            [[ -n "${added_pkg}" ]] || continue
+
+            if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+                allowed=1
+                break
+            fi
+        done < "${added}"
+
+        (( allowed == 1 )) ||
+            fail "Autoremove would remove package not introduced by profile: ${planned}"
+    done
+
+    echo "[PASS] Dependency autoremove safety gate"
+
+    LC_ALL=C apt-get autoremove -y
+else
+    echo "[INFO] No unused profile dependencies require cleanup."
+fi
 
 # Remove profile overlay files only if they are byte-for-byte unchanged.
 removed_overlay=0
