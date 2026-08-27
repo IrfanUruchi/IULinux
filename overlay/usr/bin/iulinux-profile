@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROFILE_DIR="/usr/share/iulinux/profiles"
+
+usage()
+{
+    cat <<'USAGE'
+Usage:
+  iulinux-profile list
+  iulinux-profile info <profile>
+USAGE
+}
+
+list_profiles()
+{
+    printf "%-14s %-10s %s\n" "PROFILE" "TIER" "DESCRIPTION"
+    printf "%-14s %-10s %s\n" "-------" "----" "-----------"
+
+    for manifest in "${PROFILE_DIR}"/*/profile.conf; do
+        [[ -f "${manifest}" ]] || continue
+
+        unset PROFILE_ID PROFILE_NAME PROFILE_DESCRIPTION PROFILE_TIER
+        # shellcheck disable=SC1090
+        source "${manifest}"
+
+        printf "%-14s %-10s %s\n" \
+            "${PROFILE_ID}" \
+            "${PROFILE_TIER}" \
+            "${PROFILE_DESCRIPTION}"
+    done
+}
+
+show_info()
+{
+    local id="${1:-}"
+    local manifest="${PROFILE_DIR}/${id}/profile.conf"
+
+    [[ -n "${id}" ]] || {
+        echo "[FAIL] Profile name required." >&2
+        exit 2
+    }
+
+    [[ -f "${manifest}" ]] || {
+        echo "[FAIL] Unknown IULinux profile: ${id}" >&2
+        exit 3
+    }
+
+    unset PROFILE_ID PROFILE_NAME PROFILE_DESCRIPTION PROFILE_DEFAULT PROFILE_TIER
+    # shellcheck disable=SC1090
+    source "${manifest}"
+
+    echo "============================================"
+    echo " IULinux profile: ${PROFILE_NAME}"
+    echo "============================================"
+    echo
+    echo "ID:          ${PROFILE_ID}"
+    echo "Tier:        ${PROFILE_TIER}"
+    echo "Default:     ${PROFILE_DEFAULT}"
+    echo "Description: ${PROFILE_DESCRIPTION}"
+}
+
+case "${1:-}" in
+    list)
+        list_profiles
+        ;;
+
+    info)
+        show_info "${2:-}"
+        ;;
+
+    *)
+        usage
+        exit 2
+        ;;
+esac
