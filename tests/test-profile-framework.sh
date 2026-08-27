@@ -146,3 +146,15 @@ grep -q 'Provenance archived' \
     fail "removal provenance archive missing"
 
 echo "[PASS] IULinux safe profile removal policy"
+
+grep -q 'Autoremove would remove package not introduced by profile' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "dependency autoremove safety gate missing"
+
+[[ "$(
+    grep -c '# Archive provenance instead of deleting profile history.' \
+        "${ROOTFS}/usr/lib/iulinux/profile-remove"
+)" -eq 1 ]] ||
+    fail "profile remover must contain exactly one archive block"
+
+echo "[PASS] IULinux profile lifecycle cleanup policy"
