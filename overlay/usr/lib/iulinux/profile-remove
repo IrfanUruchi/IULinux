@@ -26,3 +26,68 @@ state="${STATE_DIR}/${id}"
 
 [[ -f "${state}/installed" ]] ||
     fail "Profile is not installed: ${id}"
+
+# Load profile metadata.
+# shellcheck disable=SC1090
+source "${profile}/profile.conf"
+
+owned="${state}/packages-owned-explicit"
+
+[[ -f "${owned}" ]] ||
+    fail "Explicit package provenance missing."
+
+basepkg()
+{
+    printf '%s\n' "${1%%:*}"
+}
+
+mapfile -t owned_packages < "${owned}"
+installed_owned=()
+
+for pkg in "${owned_packages[@]}"; do
+    [[ -n "${pkg}" ]] || continue
+
+    status="$(
+        dpkg-query -W -f='${db:Status-Abbrev}' "${pkg}" \
+            2>/dev/null || true
+    )"
+
+    if [[ "${status}" == "ii " ]]; then
+        installed_owned+=("${pkg}")
+    fi
+done
+
+echo "============================================"
+echo " IULinux profile removal plan: ${PROFILE_NAME}"
+echo "============================================"
+echo
+echo "Explicit packages owned:     ${#owned_packages[@]}"
+echo "Currently installed owned:   ${#installed_owned[@]}"
+
+if (( ${#installed_owned[@]} )); then
+    simulation="$(
+        LC_ALL=C apt-get -s remove --no-auto-remove \
+            "${installed_owned[@]}"
+    )"
+
+    while IFS= read -r planned; do
+        [[ -n "${planned}" ]] || continue
+
+        planned_base="$(basepkg "${planned}")"
+        allowed=0
+
+        for owned_pkg in "${owned_packages[@]}"; do
+            if [[ "${planned_base}" == "$(basepkg "${owned_pkg}")" ]]; then
+                allowed=1
+                break
+            fi
+        done
+
+        (( allowed == 1 )) ||
+            fail "APT would remove non-profile package: ${planned}"
+    done < <(
+        awk '/^Remv / {print $2}' <<<"${simulation}"
+    )
+fi
+
+echo "[PASS] Explicit package removal safety simulation"
