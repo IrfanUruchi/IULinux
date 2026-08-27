@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Capability is available, but IULinux must never silently
+# expose an LLM server after profile installation.
+systemctl disable llama-server.service >/dev/null 2>&1 || true
+
+echo "[PASS] AI profile runtime policy applied"

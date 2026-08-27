@@ -2,6 +2,7 @@
 set -Eeuo pipefail
 
 PROFILE_DIR="/usr/share/iulinux/profiles"
+STATE_DIR="/var/lib/iulinux/profiles"
 
 usage()
 {
@@ -9,46 +10,89 @@ usage()
 Usage:
   iulinux-profile list
   iulinux-profile info <profile>
+  iulinux-profile plan <profile>
+  iulinux-profile status <profile>
+  sudo iulinux-profile install <profile>
 USAGE
 }
 
-list_profiles()
-{
-    printf "%-14s %-10s %s\n" "PROFILE" "TIER" "DESCRIPTION"
-    printf "%-14s %-10s %s\n" "-------" "----" "-----------"
-
-    for manifest in "${PROFILE_DIR}"/*/profile.conf; do
-        [[ -f "${manifest}" ]] || continue
-
-        unset PROFILE_ID PROFILE_NAME PROFILE_DESCRIPTION PROFILE_TIER
-        # shellcheck disable=SC1090
-        source "${manifest}"
-
-        printf "%-14s %-10s %s\n" \
-            "${PROFILE_ID}" \
-            "${PROFILE_TIER}" \
-            "${PROFILE_DESCRIPTION}"
-    done
-}
-
-show_info()
+load_profile()
 {
     local id="${1:-}"
-    local manifest="${PROFILE_DIR}/${id}/profile.conf"
 
     [[ -n "${id}" ]] || {
         echo "[FAIL] Profile name required." >&2
         exit 2
     }
 
-    [[ -f "${manifest}" ]] || {
+    PROFILE_PATH="${PROFILE_DIR}/${id}"
+    PROFILE_MANIFEST="${PROFILE_PATH}/profile.conf"
+
+    [[ -f "${PROFILE_MANIFEST}" ]] || {
         echo "[FAIL] Unknown IULinux profile: ${id}" >&2
         exit 3
     }
 
-    unset PROFILE_ID PROFILE_NAME PROFILE_DESCRIPTION PROFILE_DEFAULT PROFILE_TIER
+    unset \
+        PROFILE_ID \
+        PROFILE_NAME \
+        PROFILE_DESCRIPTION \
+        PROFILE_DEFAULT \
+        PROFILE_TIER
+
     # shellcheck disable=SC1090
-    source "${manifest}"
+    source "${PROFILE_MANIFEST}"
+}
+
+read_packages()
+{
+    local file="${PROFILE_PATH}/packages.list"
+
+    [[ -f "${file}" ]] || return 0
+
+    sed \
+        -e 's/#.*$//' \
+        -e '/^[[:space:]]*$/d' \
+        "${file}"
+}
+
+list_profiles()
+{
+    printf "%-14s %-10s %-11s %s\n" \
+        "PROFILE" "TIER" "STATUS" "DESCRIPTION"
+
+    printf "%-14s %-10s %-11s %s\n" \
+        "-------" "----" "------" "-----------"
+
+    for manifest in "${PROFILE_DIR}"/*/profile.conf; do
+        [[ -f "${manifest}" ]] || continue
+
+        unset \
+            PROFILE_ID \
+            PROFILE_NAME \
+            PROFILE_DESCRIPTION \
+            PROFILE_TIER
+
+        # shellcheck disable=SC1090
+        source "${manifest}"
+
+        if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+            state="installed"
+        else
+            state="available"
+        fi
+
+        printf "%-14s %-10s %-11s %s\n" \
+            "${PROFILE_ID}" \
+            "${PROFILE_TIER}" \
+            "${state}" \
+            "${PROFILE_DESCRIPTION}"
+    done
+}
+
+show_info()
+{
+    load_profile "$1"
 
     echo "============================================"
     echo " IULinux profile: ${PROFILE_NAME}"
@@ -60,6 +104,92 @@ show_info()
     echo "Description: ${PROFILE_DESCRIPTION}"
 }
 
+show_plan()
+{
+    load_profile "$1"
+
+    echo "============================================"
+    echo " IULinux profile plan: ${PROFILE_NAME}"
+    echo "============================================"
+    echo
+    echo "The following explicit packages would be installed:"
+    echo
+
+    read_packages | sed 's/^/  /'
+
+    echo
+    echo "Profile overlay:"
+    echo "  ${PROFILE_PATH}/overlay"
+    echo
+    echo "Nothing has been changed."
+}
+
+show_status()
+{
+    load_profile "$1"
+
+    if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+        echo "${PROFILE_ID}: installed"
+        exit 0
+    fi
+
+    echo "${PROFILE_ID}: not installed"
+}
+
+install_profile()
+{
+    load_profile "$1"
+
+    [[ "${EUID}" -eq 0 ]] || {
+        echo "[FAIL] Profile installation requires root." >&2
+        echo "Run:" >&2
+        echo "  sudo iulinux-profile install ${PROFILE_ID}" >&2
+        exit 4
+    }
+
+    if [[ -f "${STATE_DIR}/${PROFILE_ID}.installed" ]]; then
+        echo "[INFO] Profile already installed: ${PROFILE_ID}"
+        exit 0
+    fi
+
+    mapfile -t packages < <(read_packages)
+
+    echo "============================================"
+    echo " Installing IULinux profile: ${PROFILE_NAME}"
+    echo "============================================"
+
+    if (( ${#packages[@]} )); then
+        apt-get update
+
+        apt-get install -y --no-install-recommends \
+            "${packages[@]}"
+    fi
+
+    if [[ -d "${PROFILE_PATH}/overlay" ]]; then
+        echo
+        echo "[IULinux] Applying profile overlay..."
+        cp -a "${PROFILE_PATH}/overlay/." /
+    fi
+
+    if [[ -x "${PROFILE_PATH}/post-install" ]]; then
+        echo
+        echo "[IULinux] Applying profile policy..."
+        "${PROFILE_PATH}/post-install"
+    fi
+
+    install -d -m 0755 "${STATE_DIR}"
+
+    {
+        echo "PROFILE_ID=${PROFILE_ID}"
+        echo "INSTALLED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    } > "${STATE_DIR}/${PROFILE_ID}.installed"
+
+    echo
+    echo "============================================"
+    echo " Profile installed: ${PROFILE_NAME}"
+    echo "============================================"
+}
+
 case "${1:-}" in
     list)
         list_profiles
@@ -67,6 +197,18 @@ case "${1:-}" in
 
     info)
         show_info "${2:-}"
+        ;;
+
+    plan)
+        show_plan "${2:-}"
+        ;;
+
+    status)
+        show_status "${2:-}"
+        ;;
+
+    install)
+        install_profile "${2:-}"
         ;;
 
     *)

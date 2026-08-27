@@ -1,0 +1,18 @@
+# IULinux optional AI profile
+
+# Python application isolation
+pipx
+
+# Native numerical/runtime foundation
+libopenblas-dev
+libgomp1
+libcurl4-openssl-dev
+libssl-dev
+libnuma-dev
+numactl
+hwloc
+
+# Native local inference
+llama.cpp
+libggml0-backend-blas
+libggml0-backend-vulkan
