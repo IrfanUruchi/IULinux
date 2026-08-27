@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PROFILE_DIR="/usr/share/iulinux/profiles"
+STATE_DIR="/var/lib/iulinux/profiles"
+
+fail()
+{
+    echo "[FAIL] $*" >&2
+    exit 1
+}
+
+id="${1:-}"
+
+[[ "${EUID}" -eq 0 ]] ||
+    fail "Profile removal requires root."
+
+[[ "${id}" =~ ^[a-z0-9][a-z0-9._-]*$ ]] ||
+    fail "Invalid profile ID."
+
+profile="${PROFILE_DIR}/${id}"
+state="${STATE_DIR}/${id}"
+
+[[ -f "${profile}/profile.conf" ]] ||
+    fail "Unknown profile: ${id}"
+
+[[ -f "${state}/installed" ]] ||
+    fail "Profile is not installed: ${id}"
