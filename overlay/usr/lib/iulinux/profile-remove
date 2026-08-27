@@ -168,3 +168,47 @@ fi
 
 echo "[PASS] Explicit profile packages removed safely"
 echo "[INFO] Dependency autoremove intentionally disabled"
+
+# Remove profile overlay files only if they are byte-for-byte unchanged.
+removed_overlay=0
+preserved_overlay=0
+
+echo
+echo "[IULinux] Removing unchanged profile files..."
+
+while IFS=$'\t' read -r expected rel; do
+    [[ -n "${rel}" ]] || continue
+
+    [[ "${rel}" != /* &&
+       "${rel}" != ".." &&
+       "${rel}" != ../* &&
+       "${rel}" != */../* ]] ||
+        fail "Unsafe overlay path: ${rel}"
+
+    target="/${rel}"
+
+    if [[ ! -e "${target}" && ! -L "${target}" ]]; then
+        echo "[INFO] Already absent: ${target}"
+        continue
+    fi
+
+    current="$(hash_path "${target}")" || {
+        echo "[WARN] Unable to hash; preserving: ${target}"
+        preserved_overlay=$((preserved_overlay + 1))
+        continue
+    }
+
+    if [[ "${current}" == "${expected}" ]]; then
+        rm -f -- "${target}"
+        echo "[PASS] Removed unchanged profile file: ${target}"
+        removed_overlay=$((removed_overlay + 1))
+    else
+        echo "[WARN] Modified profile file preserved: ${target}"
+        preserved_overlay=$((preserved_overlay + 1))
+    fi
+done < "${hashes}"
+
+echo
+echo "Overlay files removed:    ${removed_overlay}"
+echo "Modified files preserved: ${preserved_overlay}"
+echo "[PASS] Profile overlay cleanup completed safely"
