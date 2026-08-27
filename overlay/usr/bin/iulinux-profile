@@ -13,6 +13,7 @@ Usage:
   iulinux-profile plan <profile>
   iulinux-profile status <profile>
   sudo iulinux-profile install <profile>
+  sudo iulinux-profile remove <profile>
 USAGE
 }
 
@@ -81,6 +82,26 @@ snapshot_packages()
         2>/dev/null |
         awk '$2 == "ii" {print $1}' |
         LC_ALL=C sort -u
+}
+
+hash_runtime_path()
+{
+    local path="$1"
+
+    if [[ -L "${path}" ]]; then
+        printf 'symlink:%s' "$(readlink -- "${path}")" |
+            sha256sum |
+            awk '{print $1}'
+        return
+    fi
+
+    if [[ -f "${path}" ]]; then
+        sha256sum "${path}" |
+            awk '{print $1}'
+        return
+    fi
+
+    return 1
 }
 
 overlay_file_list()
@@ -244,7 +265,8 @@ install_profile()
     }
     trap cleanup EXIT
 
-    printf '%s\n' "${packages[@]}" \
+    printf '%s\n' "${packages[@]}" |
+        LC_ALL=C sort -u \
         > "${tmp_state}/packages-requested"
 
     snapshot_packages \
@@ -257,6 +279,10 @@ install_profile()
             echo "${pkg}" >> "${tmp_state}/packages-preexisting"
         fi
     done
+
+    LC_ALL=C sort -u -o         "${tmp_state}/packages-preexisting"         "${tmp_state}/packages-preexisting"
+
+    LC_ALL=C comm -23         "${tmp_state}/packages-requested"         "${tmp_state}/packages-preexisting"         > "${tmp_state}/packages-owned-explicit"
 
     if (( ${#packages[@]} )); then
         apt-get update
@@ -297,6 +323,21 @@ install_profile()
         echo "[IULinux] Applying profile policy..."
         "${PROFILE_PATH}/post-install"
     fi
+
+    : > "${tmp_state}/overlay-sha256"
+
+    while IFS= read -r rel; do
+        [[ -n "${rel}" ]] || continue
+
+        target="/${rel}"
+
+        hash="$(hash_runtime_path "${target}")" || {
+            echo "[FAIL] Unable to hash deployed profile file: ${target}" >&2
+            exit 7
+        }
+
+        printf '%s\t%s\n' "${hash}" "${rel}"             >> "${tmp_state}/overlay-sha256"
+    done < "${tmp_state}/overlay-files"
 
     {
         echo "PROFILE_ID=${PROFILE_ID}"
@@ -353,6 +394,10 @@ case "${1:-}" in
 
     install)
         install_profile "${2:-}"
+        ;;
+
+    remove)
+        exec /usr/lib/iulinux/profile-remove "${2:-}"
         ;;
 
     *)

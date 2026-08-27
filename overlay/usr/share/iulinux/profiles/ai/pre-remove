@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+# Never leave a local inference server running after
+# the AI profile itself is removed.
+systemctl disable --now llama-server.service >/dev/null 2>&1 || true
+
+echo "[PASS] AI profile removal policy applied"
