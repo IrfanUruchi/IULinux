@@ -76,11 +76,11 @@ package_is_installed()
 
 snapshot_packages()
 {
-    dpkg-query -W \
+    LC_ALL=C dpkg-query -W \
         -f='${binary:Package} ${db:Status-Abbrev}\n' \
         2>/dev/null |
         awk '$2 == "ii" {print $1}' |
-        sort -u
+        LC_ALL=C sort -u
 }
 
 overlay_file_list()
@@ -268,7 +268,7 @@ install_profile()
     snapshot_packages \
         > "${tmp_state}/packages-after"
 
-    comm -13 \
+    LC_ALL=C comm -13 \
         "${tmp_state}/packages-before" \
         "${tmp_state}/packages-after" \
         > "${tmp_state}/packages-added"
