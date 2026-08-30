@@ -23,19 +23,19 @@ for (const oldPanel of panels()) {
 const panel = new Panel;
 
 panel.location = "bottom";
-panel.height = 44;
+panel.height = 48;
 panel.alignment = "center";
 panel.hiding = "none";
 panel.lengthMode = "custom";
 
 const geometry = screenGeometry(0);
 panel.length = Math.min(
-    Math.round(geometry.width * 0.92),
-    1600
+    Math.round(geometry.width * 0.78),
+    1280
 );
 
 panel.minimumLength = Math.min(640, geometry.width);
-panel.maximumLength = Math.min(1600, geometry.width);
+panel.maximumLength = Math.min(1280, geometry.width);
 
 // Plasma stores floating-view behavior in plasmashellrc.
 const plasmaViews = new ConfigFile(
@@ -77,6 +77,10 @@ launcher.globalShortcut = "Alt+F1";
 // ---------------------------------------------------------
 // Application / task area
 // ---------------------------------------------------------
+
+panel.addWidget(
+    "org.kde.plasma.panelspacer"
+);
 
 const tasks = panel.addWidget(
     "org.kde.plasma.icontasks"
@@ -120,7 +124,7 @@ clock.currentConfigGroup = [
 
 clock.writeConfig(
     "showDate",
-    "true"
+    "false"
 );
 
 clock.writeConfig(
