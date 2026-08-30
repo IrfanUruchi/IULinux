@@ -1,11 +1,14 @@
 [kdeglobals][General]
-ColorScheme=BreezeDark
+ColorScheme=IULinuxDark
 
 [kdeglobals][Icons]
 Theme=breeze-dark
 
 [kwinrc][org.kde.kdecoration2]
-library=org.kde.breeze
+library=org.kde.kwin.aurorae
+theme=__aurorae__svg__IULinuxPremium
+ButtonsOnLeft=
+ButtonsOnRight=IAX
 
 [plasmarc][Theme]
 name=breeze-dark
