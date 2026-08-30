@@ -1,9 +1,8 @@
 [Desktop Entry]
 Name=IULinux Premium
 Comment=Premium IULinux window decoration
-Type=Application
+Type=Service
 X-KDE-PluginInfo-Name=IULinuxPremium
 X-KDE-PluginInfo-Author=IULinux Project
 X-KDE-PluginInfo-Version=0.1
 X-KDE-PluginInfo-License=GPL-3.0-or-later
-X-KDE-PluginInfo-EnabledByDefault=true
