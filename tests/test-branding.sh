@@ -57,7 +57,11 @@ grep -qF     'file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png
 [[ -s "${LAUNCHER_ICON}" ]] ||
     fail "IULinux launcher icon is empty"
 
-grep -qF 'widget.writeConfig("icon", "iulinux")'     "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ||
+LAYOUT="${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js"
+
+grep -qF 'launcher.writeConfig(' "${LAYOUT}" &&
+grep -qF '"icon",' "${LAYOUT}" &&
+grep -qF '"iulinux"' "${LAYOUT}" ||
     fail "IULinux launcher icon policy missing"
 
 [[ -f "${WALLPAPER}" ]] ||

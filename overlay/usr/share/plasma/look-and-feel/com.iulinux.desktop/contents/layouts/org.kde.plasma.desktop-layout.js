@@ -1,3 +1,17 @@
+// IULinux branded desktop wallpaper
+for (const desktop of desktops()) {
+    desktop.wallpaperPlugin = "org.kde.image";
+    desktop.currentConfigGroup = [
+        "Wallpaper",
+        "org.kde.image",
+        "General"
+    ];
+    desktop.writeConfig(
+        "Image",
+        "file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png"
+    );
+}
+
 // IULinux Premium Workstation Layout
 // Plasma 6
 
