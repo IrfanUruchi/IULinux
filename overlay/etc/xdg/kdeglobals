@@ -1,8 +1,10 @@
 [General]
-ColorScheme=BreezeDark
-
+ColorScheme=IULinuxDark
+Name=IULinux
 [Icons]
 Theme=breeze-dark
 
 [KDE]
 LookAndFeelPackage=com.iulinux.desktop
+widgetStyle=Breeze
+contrast=4
