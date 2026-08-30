@@ -1,50 +1,115 @@
-loadTemplate("org.kde.plasma.desktop.defaultPanel")
+// IULinux Premium Workstation Layout
+// Plasma 6
 
-var desktopsArray = desktopsForActivity(currentActivity());
-for( var j = 0; j < desktopsArray.length; j++) {
-    desktopsArray[j].wallpaperPlugin = 'org.kde.image';
+// The IULinux global theme owns the initial panel layout.
+for (const oldPanel of panels()) {
+    oldPanel.remove();
 }
 
+const panel = new Panel;
 
-// ------------------------------------------------------------
-// IULinux default desktop wallpaper
-// ------------------------------------------------------------
+panel.location = "bottom";
+panel.height = 44;
+panel.alignment = "center";
+panel.hiding = "none";
+panel.lengthMode = "custom";
 
-var iulinuxDesktops = desktops();
+const geometry = screenGeometry(0);
+panel.length = Math.min(
+    Math.round(geometry.width * 0.92),
+    1600
+);
 
-for (var i = 0; i < iulinuxDesktops.length; ++i) {
-    var desktop = iulinuxDesktops[i];
+panel.minimumLength = Math.min(640, geometry.width);
+panel.maximumLength = Math.min(1600, geometry.width);
 
-    desktop.wallpaperPlugin = "org.kde.image";
+// Plasma stores floating-view behavior in plasmashellrc.
+const plasmaViews = new ConfigFile(
+    "plasmashellrc",
+    "PlasmaViews"
+);
 
-    desktop.currentConfigGroup = [
-        "Wallpaper",
-        "org.kde.image",
-        "General"
-    ];
+const panelView = new ConfigFile(
+    plasmaViews,
+    "Panel " + panel.id
+);
 
-    desktop.writeConfig(
-        "Image",
-        "file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png"
-    );
-}
+panelView.writeEntry("floating", "1");
+
+const panelDefaults = new ConfigFile(
+    panelView,
+    "Defaults"
+);
+
+panelDefaults.writeEntry("thickness", "44");
 
 
-// ------------------------------------------------------------
-// IULinux launcher branding
-// ------------------------------------------------------------
+// ---------------------------------------------------------
+// IU launcher
+// ---------------------------------------------------------
 
-var iulinuxPanels = panels();
+const launcher = panel.addWidget(
+    "org.kde.plasma.kickoff"
+);
 
-for (var p = 0; p < iulinuxPanels.length; ++p) {
-    var panelWidgets = iulinuxPanels[p].widgets();
+launcher.writeConfig(
+    "icon",
+    "iulinux"
+);
 
-    for (var w = 0; w < panelWidgets.length; ++w) {
-        var widget = panelWidgets[w];
+launcher.globalShortcut = "Alt+F1";
 
-        if (widget.type === "org.kde.plasma.kickoff") {
-            widget.currentConfigGroup = ["General"];
-            widget.writeConfig("icon", "iulinux");
-        }
-    }
-}
+
+// ---------------------------------------------------------
+// Application / task area
+// ---------------------------------------------------------
+
+const tasks = panel.addWidget(
+    "org.kde.plasma.icontasks"
+);
+
+tasks.writeConfig(
+    "launchers",
+    [
+        "applications:brave-browser.desktop",
+        "applications:org.kde.dolphin.desktop",
+        "applications:org.kde.konsole.desktop",
+        "applications:systemsettings.desktop"
+    ]
+);
+
+
+// ---------------------------------------------------------
+// Flexible visual separation
+// ---------------------------------------------------------
+
+panel.addWidget(
+    "org.kde.plasma.panelspacer"
+);
+
+
+// ---------------------------------------------------------
+// System status
+// ---------------------------------------------------------
+
+panel.addWidget(
+    "org.kde.plasma.systemtray"
+);
+
+const clock = panel.addWidget(
+    "org.kde.plasma.digitalclock"
+);
+
+clock.currentConfigGroup = [
+    "Appearance"
+];
+
+clock.writeConfig(
+    "showDate",
+    "true"
+);
+
+clock.writeConfig(
+    "showSeconds",
+    "false"
+);
