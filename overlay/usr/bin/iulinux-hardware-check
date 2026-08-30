@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -u
+
+pass(){ echo "[PASS] $*"; }
+info(){ echo "[INFO] $*"; }
+warn(){ echo "[WARN] $*"; }
+
+echo "============================================"
+echo " IULinux hardware smoke check"
+echo "============================================"
+echo
+
+echo "=== SYSTEM ==="
+grep -E '^(PRETTY_NAME|VERSION_ID)=' /usr/lib/os-release
+uname -r
+echo
+
+echo "=== CPU ==="
+lscpu | grep -E 'Model name|Architecture|CPU\(s\)'
+echo
+
+echo "=== GRAPHICS ==="
+lspci -nn | grep -Ei 'vga|3d|display' || warn "No display adapter detected"
+
+if command -v glxinfo >/dev/null; then
+    glxinfo -B 2>/dev/null | grep -E 'OpenGL vendor|OpenGL renderer' || true
+fi
+
+if command -v vulkaninfo >/dev/null; then
+    vulkaninfo --summary 2>/dev/null | grep -E 'deviceName|driverName' || true
+fi
+
+echo
+echo "=== NETWORK ==="
+nmcli device status || warn "NetworkManager query failed"
+
+echo
+echo "=== AUDIO ==="
+if command -v wpctl >/dev/null; then
+    wpctl status | sed -n '/Audio/,/Video/p' | head -40
+    pass "PipeWire available"
+else
+    warn "wpctl unavailable"
+fi
+
+echo
+echo "=== BLUETOOTH ==="
+if command -v bluetoothctl >/dev/null; then
+    bluetoothctl list || true
+    pass "Bluetooth userspace available"
+else
+    info "Bluetooth userspace not installed"
+fi
+
+echo
+echo "=== STORAGE ==="
+lsblk -o NAME,SIZE,TYPE,FSTYPE,MODEL,MOUNTPOINTS
+echo
+
+echo "=== USB ==="
+lsusb | head -30
+echo
+
+echo "=== FAILED SERVICES ==="
+failed="$(systemctl --failed --no-legend 2>/dev/null | wc -l)"
+
+if [[ "$failed" -eq 0 ]]; then
+    pass "Zero failed systemd units"
+else
+    warn "$failed failed systemd unit(s)"
+    systemctl --failed --no-pager
+fi
+
+echo
+echo "============================================"
+echo " IULinux hardware smoke check complete"
+echo "============================================"
