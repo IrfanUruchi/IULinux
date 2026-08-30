@@ -41,3 +41,11 @@ xdg-desktop-portal-kde
 xserver-xorg-core
 xserver-xorg-input-libinput
 xwayland
+
+# IULinux workstation control
+systemsettings
+kscreen
+plasma-nm
+plasma-pa
+bluez
+bluedevil
