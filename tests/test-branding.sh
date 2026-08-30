@@ -34,7 +34,7 @@ grep -q '"Id": "com.iulinux.desktop"' \
 [[ -f "${LAF}/contents/layouts/org.kde.plasma.desktop-layout.js" ]] ||
     fail "IULinux Plasma desktop layout missing"
 
-grep -qx 'ColorScheme=BreezeDark' \
+grep -qx 'ColorScheme=IULinuxDark' \
     "${LAF}/contents/defaults" ||
     fail "IULinux color scheme policy missing"
 
