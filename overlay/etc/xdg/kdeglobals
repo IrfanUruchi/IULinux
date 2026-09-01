@@ -14,6 +14,9 @@ Theme=breeze-dark
 LookAndFeelPackage=com.iulinux.desktop
 widgetStyle=Breeze
 contrast=4
+AutomaticLookAndFeel=false
+DefaultDarkLookAndFeel=com.iulinux.desktop
+AnimationDurationFactor=0.85
 
 SingleClick=false
 SmoothScroll=true
