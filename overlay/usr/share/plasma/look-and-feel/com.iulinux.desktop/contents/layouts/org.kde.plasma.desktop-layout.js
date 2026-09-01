@@ -26,16 +26,7 @@ panel.location = "bottom";
 panel.height = 48;
 panel.alignment = "center";
 panel.hiding = "none";
-panel.lengthMode = "custom";
-
-const geometry = screenGeometry(0);
-panel.length = Math.min(
-    Math.round(geometry.width * 0.78),
-    1280
-);
-
-panel.minimumLength = Math.min(640, geometry.width);
-panel.maximumLength = Math.min(1280, geometry.width);
+panel.lengthMode = "fit";
 
 // Plasma stores floating-view behavior in plasmashellrc.
 const plasmaViews = new ConfigFile(
@@ -78,10 +69,6 @@ launcher.globalShortcut = "Alt+F1";
 // Application / task area
 // ---------------------------------------------------------
 
-panel.addWidget(
-    "org.kde.plasma.panelspacer"
-);
-
 const tasks = panel.addWidget(
     "org.kde.plasma.icontasks"
 );
@@ -98,23 +85,37 @@ tasks.writeConfig(
 
 
 // ---------------------------------------------------------
-// Flexible visual separation
+// Right-side status island
 // ---------------------------------------------------------
 
-panel.addWidget(
-    "org.kde.plasma.panelspacer"
+const statusPanel = new Panel;
+
+statusPanel.location = "bottom";
+statusPanel.height = 48;
+statusPanel.alignment = "right";
+statusPanel.hiding = "none";
+statusPanel.lengthMode = "fit";
+statusPanel.offset = 24;
+
+const statusView = new ConfigFile(
+    plasmaViews,
+    "Panel " + statusPanel.id
 );
 
+statusView.writeEntry("floating", "1");
 
-// ---------------------------------------------------------
-// System status
-// ---------------------------------------------------------
+const statusDefaults = new ConfigFile(
+    statusView,
+    "Defaults"
+);
 
-panel.addWidget(
+statusDefaults.writeEntry("thickness", "44");
+
+statusPanel.addWidget(
     "org.kde.plasma.systemtray"
 );
 
-const clock = panel.addWidget(
+const clock = statusPanel.addWidget(
     "org.kde.plasma.digitalclock"
 );
 
