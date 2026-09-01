@@ -16,7 +16,7 @@ widgetStyle=Breeze
 contrast=4
 AutomaticLookAndFeel=false
 DefaultDarkLookAndFeel=com.iulinux.desktop
-AnimationDurationFactor=0.85
+AnimationDurationFactor=1.10
 
 SingleClick=false
 SmoothScroll=true
