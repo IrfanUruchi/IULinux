@@ -201,6 +201,7 @@ SessionManagementScreen {
                 : ""
             icon.width: Kirigami.Units.iconSizes.sizeForLabels
             icon.height: Kirigami.Units.iconSizes.sizeForLabels
+            icon.color: "#EEF2F7"
 
             palette.buttonText: "#EEF2F7"
             palette.highlight: "#3D8DFF"
