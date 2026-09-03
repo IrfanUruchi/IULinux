@@ -68,28 +68,40 @@ package_status()
 grep -qx '\[Theme\]' "${SDDM_POLICY}" ||
     fail "IULinux SDDM Theme section missing"
 
-grep -qx 'Current=breeze' "${SDDM_POLICY}" ||
-    fail "IULinux SDDM theme is not Breeze"
+grep -qx 'Current=iulinux' "${SDDM_POLICY}" ||
+    fail "IULinux SDDM theme is not IULinux"
 
 # ------------------------------------------------------------
-# IULinux Breeze override
+# IULinux SDDM theme
 # ------------------------------------------------------------
 
-[[ -f "${THEME_OVERRIDE}" ]] ||
-    fail "IULinux SDDM Breeze override missing"
+IULINUX_THEME="${ROOTFS_DIR}/usr/share/sddm/themes/iulinux"
 
-grep -qx '\[General\]' "${THEME_OVERRIDE}" ||
-    fail "IULinux SDDM General section missing"
+[[ -s "${IULINUX_THEME}/Main.qml" ]] ||
+    fail "IULinux SDDM Main.qml missing or empty"
 
-grep -qx 'type=image' "${THEME_OVERRIDE}" ||
-    fail "IULinux SDDM image mode missing"
+[[ -s "${IULINUX_THEME}/Login.qml" ]] ||
+    fail "IULinux SDDM Login.qml missing or empty"
 
-grep -qx \
-    'background=/usr/share/wallpapers/IULinux/contents/images/3840x2160.png' \
-    "${THEME_OVERRIDE}" ||
+[[ -s "${IULINUX_THEME}/metadata.desktop" ]] ||
+    fail "IULinux SDDM metadata missing or empty"
+
+[[ -s "${IULINUX_THEME}/theme.conf" ]] ||
+    fail "IULinux SDDM theme.conf missing or empty"
+
+grep -qx 'Theme-Id=iulinux' "${IULINUX_THEME}/metadata.desktop" ||
+    fail "IULinux SDDM theme ID incorrect"
+
+grep -qx 'showlogo=shown' "${IULINUX_THEME}/theme.conf" ||
+    fail "IULinux SDDM logo policy missing"
+
+grep -qx 'logo=/usr/share/pixmaps/iulinux-logo.png' "${IULINUX_THEME}/theme.conf" ||
+    fail "IULinux SDDM logo path incorrect"
+
+grep -qx     'background=/usr/share/wallpapers/IULinux/contents/images/3840x2160.png'     "${IULINUX_THEME}/theme.conf" ||
     fail "IULinux SDDM wallpaper policy incorrect"
 
-grep -qx 'color=#0b0f16' "${THEME_OVERRIDE}" ||
+grep -qx 'color=#0b0f14' "${IULINUX_THEME}/theme.conf" ||
     fail "IULinux SDDM fallback color incorrect"
 
 # ------------------------------------------------------------
