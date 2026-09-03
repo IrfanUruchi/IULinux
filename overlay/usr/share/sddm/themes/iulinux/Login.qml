@@ -118,6 +118,32 @@ SessionManagementScreen {
             placeholderText: i18ndc("plasma-desktop-sddm-theme",  "@info:placeholder in textfield", "Password")
             focus: !showUsernamePrompt || lastUserName
 
+            background: Rectangle {
+                implicitWidth: Kirigami.Units.gridUnit * 12
+                implicitHeight: Kirigami.Units.gridUnit * 2.2
+
+                radius: 10
+                color: "#141922"
+
+                border.width: 1
+                border.color: passwordBox.activeFocus
+                    ? "#3D8DFF"
+                    : "#55677A96"
+
+                property var margins: ({
+                    left: 12,
+                    right: 12,
+                    top: 8,
+                    bottom: 8
+                })
+            }
+
+            palette.base: "#141922"
+            palette.text: "#EEF2F7"
+            palette.placeholderText: "#8F9AAA"
+            palette.highlight: "#3D8DFF"
+            palette.highlightedText: "#FFFFFF"
+
             // Disable reveal password action because SDDM does not have the breeze icon set loaded
             rightActions: []
 
@@ -159,11 +185,53 @@ SessionManagementScreen {
             id: loginButton
             Accessible.name: i18ndc("plasma-desktop-sddm-theme", "@action:button Accessible name", "Log in")
             Layout.preferredHeight: passwordBox.implicitHeight
-            Layout.preferredWidth: text.length === 0 ? loginButton.Layout.preferredHeight : -1
+            Layout.preferredWidth: loginButton.text.length === 0
+                ? loginButton.Layout.preferredHeight
+                : -1
 
-            icon.name: text.length === 0 ? (root.LayoutMirroring.enabled ? "go-previous" : "go-next") : ""
+            topPadding: 8
+            bottomPadding: 8
+            leftPadding: loginButton.text.length === 0 ? 10 : 16
+            rightPadding: loginButton.text.length === 0 ? 10 : 16
 
-            text: root.showUsernamePrompt || userList.currentItem.needsPassword ? "" : i18nc("@action:button", "Log In")
+            font.pointSize: fontSize + 1
+
+            icon.name: loginButton.text.length === 0
+                ? (root.LayoutMirroring.enabled ? "go-previous" : "go-next")
+                : ""
+            icon.width: Kirigami.Units.iconSizes.sizeForLabels
+            icon.height: Kirigami.Units.iconSizes.sizeForLabels
+
+            palette.buttonText: "#EEF2F7"
+            palette.highlight: "#3D8DFF"
+            palette.highlightedText: "#FFFFFF"
+
+            background: Rectangle {
+                implicitWidth: loginButton.text.length === 0
+                    ? Kirigami.Units.gridUnit * 2.2
+                    : Kirigami.Units.gridUnit * 5.5
+                implicitHeight: Kirigami.Units.gridUnit * 2.2
+
+                radius: 10
+                color: !loginButton.enabled
+                    ? "#1B212B"
+                    : loginButton.down
+                        ? "#1E2630"
+                        : loginButton.hovered
+                            ? "#2C3542"
+                            : "#252C36"
+
+                border.width: 1
+                border.color: (loginButton.activeFocus || loginButton.visualFocus)
+                    ? "#3D8DFF"
+                    : loginButton.hovered
+                        ? "#6B7A8A"
+                        : "#4A5664"
+            }
+
+            text: root.showUsernamePrompt || userList.currentItem.needsPassword
+                ? ""
+                : i18nc("@action:button", "Log In")
             onClicked: startLogin()
             Keys.onEnterPressed: clicked()
             Keys.onReturnPressed: clicked()
