@@ -1,0 +1,15 @@
+[SddmGreeterTheme]
+Name=IULinux
+Description=IULinux premium login experience
+Author=IULinux Project; KDE Visual Design Group
+Copyright=(c) 2026 IULinux Project; based on KDE Breeze
+License=CC-BY-SA
+Type=sddm-theme
+Version=0.1
+Screenshot=preview.png
+MainScript=Main.qml
+ConfigFile=theme.conf
+TranslationsDirectory=translations
+Theme-Id=iulinux
+Theme-API=2.0
+QtVersion=6
