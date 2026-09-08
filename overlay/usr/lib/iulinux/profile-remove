@@ -40,9 +40,15 @@ added="${state}/packages-added"
 [[ -f "${added}" ]] ||
     fail "Added-package provenance missing."
 
-basepkg()
+package_id()
 {
-    printf '%s\n' "${1%%:*}"
+    local pkg="$1"
+
+    if [[ "${pkg}" == *:* ]]; then
+        printf '%s\n' "${pkg}"
+    else
+        printf '%s:%s\n' "${pkg}" "$(dpkg --print-architecture)"
+    fi
 }
 
 mapfile -t owned_packages < "${owned}"
@@ -77,11 +83,11 @@ if (( ${#installed_owned[@]} )); then
     while IFS= read -r planned; do
         [[ -n "${planned}" ]] || continue
 
-        planned_base="$(basepkg "${planned}")"
+        planned_base="$(package_id "${planned}")"
         allowed=0
 
         for owned_pkg in "${owned_packages[@]}"; do
-            if [[ "${planned_base}" == "$(basepkg "${owned_pkg}")" ]]; then
+            if [[ "${planned_base}" == "$(package_id "${owned_pkg}")" ]]; then
                 allowed=1
                 break
             fi
@@ -91,7 +97,7 @@ if (( ${#installed_owned[@]} )); then
             while IFS= read -r added_pkg; do
                 [[ -n "${added_pkg}" ]] || continue
 
-                if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+                if [[ "${planned_base}" == "$(package_id "${added_pkg}")" ]]; then
                     allowed=1
                     break
                 fi
@@ -192,12 +198,12 @@ mapfile -t autoremove_candidates < <(
 safe_candidates=()
 
 for planned in "${autoremove_candidates[@]}"; do
-    planned_base="$(basepkg "${planned}")"
+    planned_base="$(package_id "${planned}")"
 
     while IFS= read -r added_pkg; do
         [[ -n "${added_pkg}" ]] || continue
 
-        if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+        if [[ "${planned_base}" == "$(package_id "${added_pkg}")" ]]; then
             safe_candidates+=("${planned}")
             break
         fi
@@ -214,13 +220,13 @@ if (( ${#safe_candidates[@]} )); then
 
     while IFS= read -r planned; do
         [[ -n "${planned}" ]] || continue
-        planned_base="$(basepkg "${planned}")"
+        planned_base="$(package_id "${planned}")"
         allowed=0
 
         while IFS= read -r added_pkg; do
             [[ -n "${added_pkg}" ]] || continue
 
-            if [[ "${planned_base}" == "$(basepkg "${added_pkg}")" ]]; then
+            if [[ "${planned_base}" == "$(package_id "${added_pkg}")" ]]; then
                 allowed=1
                 break
             fi
@@ -291,8 +297,10 @@ if [[ -f "${architectures_added}" ]]; then
     while IFS= read -r arch; do
         [[ -n "${arch}" ]] || continue
 
+        native_arch="$(dpkg --print-architecture)"
+
         # Native architecture must never be removed.
-        if [[ "${arch}" == "$(dpkg --print-architecture)" ]]; then
+        if [[ "${arch}" == "${native_arch}" ]]; then
             echo "[WARN] Refusing to remove native architecture: ${arch}"
             continue
         fi
@@ -317,14 +325,99 @@ if [[ -f "${architectures_added}" ]]; then
             continue
         fi
 
-        # dpkg cannot remove an architecture while installed packages still use it.
-        if dpkg-query -W \
-            -f='${Architecture} ${db:Status-Abbrev}\n' \
-            2>/dev/null |
-            awk -v arch="${arch}" '$1 == arch && $2 == "ii" {found=1} END {exit !found}'
-        then
-            echo "[INFO] Architecture preserved; installed packages still use it: ${arch}"
-            continue
+        # Identify installed packages using this foreign architecture.
+        mapfile -t arch_installed < <(
+            dpkg-query -W \
+                -f='${binary:Package}\t${Architecture}\t${db:Status-Abbrev}\n' \
+                2>/dev/null |
+            awk -F '\t' -v arch="${arch}" \
+                '$2 == arch && $3 ~ /^ii/ {print $1}' |
+            sort -u
+        )
+
+        if (( ${#arch_installed[@]} )); then
+            # Every remaining foreign-architecture package must have been
+            # introduced by this profile. Otherwise preserve the architecture.
+            unowned=0
+
+            for installed_pkg in "${arch_installed[@]}"; do
+                owned=0
+                installed_id="$(package_id "${installed_pkg}")"
+
+                while IFS= read -r added_pkg; do
+                    [[ -n "${added_pkg}" ]] || continue
+
+                    if [[ "${installed_id}" == "$(package_id "${added_pkg}")" ]]; then
+                        owned=1
+                        break
+                    fi
+                done < "${added}"
+
+                if (( owned == 0 )); then
+                    echo "[INFO] Architecture preserved; package not owned by profile: ${installed_pkg}"
+                    unowned=1
+                fi
+            done
+
+            if (( unowned == 1 )); then
+                continue
+            fi
+
+            # Ask APT exactly what removing the profile-owned foreign packages
+            # would do before allowing any protected/essential removal.
+            teardown_sim="$(
+                LC_ALL=C apt-get -s remove --no-auto-remove \
+                    "${arch_installed[@]}"
+            )"
+
+            mapfile -t teardown_planned < <(
+                awk '/^Remv / {print $2}' <<<"${teardown_sim}"
+            )
+
+            (( ${#teardown_planned[@]} )) ||
+                fail "Foreign-architecture teardown produced no removal plan: ${arch}"
+
+            for planned in "${teardown_planned[@]}"; do
+                planned_id="$(package_id "${planned}")"
+
+                [[ "${planned_id}" == *":${arch}" ]] ||
+                    fail "Foreign-architecture teardown would remove another architecture: ${planned}"
+
+                allowed=0
+
+                while IFS= read -r added_pkg; do
+                    [[ -n "${added_pkg}" ]] || continue
+
+                    if [[ "${planned_id}" == "$(package_id "${added_pkg}")" ]]; then
+                        allowed=1
+                        break
+                    fi
+                done < "${added}"
+
+                (( allowed == 1 )) ||
+                    fail "Foreign-architecture teardown would remove package not introduced by profile: ${planned}"
+            done
+
+            echo "[PASS] Foreign-architecture teardown safety gate: ${arch}"
+
+            # Some foreign-architecture instances are marked Essential by dpkg.
+            # This override is permitted only after the strict provenance and
+            # architecture safety checks above have passed.
+            LC_ALL=C apt-get remove -y --no-auto-remove \
+                --allow-remove-essential \
+                "${arch_installed[@]}"
+
+            # Removal must leave no installed packages on the architecture.
+            if dpkg-query -W \
+                -f='${Architecture}\t${db:Status-Abbrev}\n' \
+                2>/dev/null |
+                awk -F '\t' -v arch="${arch}" \
+                    '$1 == arch && $2 ~ /^ii/ {found=1} END {exit !found}'
+            then
+                fail "Foreign architecture still has installed packages after teardown: ${arch}"
+            fi
+
+            echo "[PASS] Removed profile-owned foreign-architecture packages: ${arch}"
         fi
 
         if dpkg --print-foreign-architectures | grep -qxF "${arch}"; then
@@ -333,6 +426,188 @@ if [[ -f "${architectures_added}" ]]; then
         fi
     done < "${architectures_added}"
 fi
+
+# Remove any remaining native/all-architecture packages introduced by
+# this profile when APT proves the teardown cannot touch outside provenance.
+native_arch="$(dpkg --print-architecture)"
+residual_candidates=()
+
+while IFS= read -r added_pkg; do
+    [[ -n "${added_pkg}" ]] || continue
+
+    dpkg-query -s "${added_pkg}" 2>/dev/null |
+        grep -q '^Status: install ok installed$' || continue
+
+    pkg_arch="$(
+        dpkg-query -W -f='${Architecture}' "${added_pkg}" 2>/dev/null
+    )"
+
+    [[ "${pkg_arch}" == "${native_arch}" || "${pkg_arch}" == "all" ]] ||
+        continue
+
+    residual_candidates+=("${added_pkg}")
+done < "${added}"
+
+if (( ${#residual_candidates[@]} )); then
+    residual_sim="$(
+        LC_ALL=C apt-get -s remove --no-auto-remove \
+            "${residual_candidates[@]}"
+    )"
+
+    mapfile -t residual_planned < <(
+        awk '/^Remv / {print $2}' <<<"${residual_sim}"
+    )
+
+    (( ${#residual_planned[@]} )) ||
+        fail "Residual profile cleanup produced no removal plan"
+
+    for planned in "${residual_planned[@]}"; do
+        planned_id="$(package_id "${planned}")"
+        allowed=0
+
+        while IFS= read -r added_pkg; do
+            [[ -n "${added_pkg}" ]] || continue
+
+            if [[ "${planned_id}" == "$(package_id "${added_pkg}")" ]]; then
+                allowed=1
+                break
+            fi
+        done < "${added}"
+
+        (( allowed == 1 )) ||
+            fail "Residual cleanup would remove package not introduced by profile: ${planned}"
+    done
+
+    echo "[PASS] Residual profile package cleanup safety gate"
+
+    LC_ALL=C apt-get remove -y --no-auto-remove \
+        "${residual_candidates[@]}"
+
+    for pkg in "${residual_candidates[@]}"; do
+        if dpkg-query -s "${pkg}" 2>/dev/null |
+            grep -q '^Status: install ok installed$'
+        then
+            fail "Residual profile package remains installed: ${pkg}"
+        fi
+    done
+
+    echo "[PASS] Removed residual profile-added packages: ${#residual_candidates[@]}"
+else
+    echo "[INFO] No residual profile-added packages require cleanup."
+fi
+
+# Purge residual dpkg config records introduced by this profile only when
+# all remaining conffiles are absent or byte-for-byte unchanged.
+rc_purged="${state}/rc-purged"
+rc_preserved="${state}/rc-preserved"
+
+: > "${rc_purged}"
+: > "${rc_preserved}"
+
+while IFS= read -r added_pkg; do
+    [[ -n "${added_pkg}" ]] || continue
+
+    status="$(
+        dpkg-query -W -f='${db:Status-Abbrev}' \
+            "${added_pkg}" 2>/dev/null || true
+    )"
+
+    [[ "${status}" == rc* ]] || continue
+
+    safe_to_purge=1
+    shared_paths=()
+    shared_hashes=()
+
+    while read -r path expected _rest; do
+        [[ -n "${path}" ]] || continue
+
+        # Unknown/non-MD5 conffile metadata is preserved conservatively.
+        if [[ ! "${expected}" =~ ^[0-9a-fA-F]{32}$ ]]; then
+            echo "[WARN] Residual config preserved; unrecognized conffile metadata: ${added_pkg} ${path}"
+            safe_to_purge=0
+            break
+        fi
+
+        # Already-absent conffiles are safe.
+        if [[ ! -e "${path}" ]]; then
+            continue
+        fi
+
+        current="$(md5sum "${path}" | awk '{print $1}')"
+
+        if [[ "${current}" != "${expected}" ]]; then
+            echo "[WARN] Residual config preserved; modified conffile: ${added_pkg} ${path}"
+            safe_to_purge=0
+            break
+        fi
+
+        # If an installed package also owns this path, require its expected
+        # conffile hash to match and verify the file survives the purge.
+        owners="$(
+            dpkg-query -S "${path}" 2>/dev/null |
+                sed -n 's/: .*//p' |
+                tr ',' '\n' |
+                sed 's/^[[:space:]]*//;s/[[:space:]]*$//' |
+                sort -u
+        )"
+
+        while IFS= read -r owner; do
+            [[ -n "${owner}" ]] || continue
+            [[ "${owner}" != "${added_pkg}" ]] || continue
+
+            owner_status="$(
+                dpkg-query -W -f='${db:Status-Abbrev}' \
+                    "${owner}" 2>/dev/null || true
+            )"
+
+            [[ "${owner_status}" == ii* ]] || continue
+
+            owner_expected="$(
+                dpkg-query -W -f='${Conffiles}\n' "${owner}" 2>/dev/null |
+                    awk -v p="${path}" '$1 == p {print $2; exit}'
+            )"
+
+            if [[ ! "${owner_expected}" =~ ^[0-9a-fA-F]{32}$ ||
+                  "${owner_expected}" != "${current}" ]]; then
+                echo "[WARN] Residual config preserved; shared conffile ownership mismatch: ${path}"
+                safe_to_purge=0
+                break 2
+            fi
+
+            shared_paths+=("${path}")
+            shared_hashes+=("${current}")
+        done <<< "${owners}"
+    done < <(
+        dpkg-query -W -f='${Conffiles}\n' \
+            "${added_pkg}" 2>/dev/null || true
+    )
+
+    if (( safe_to_purge == 0 )); then
+        printf '%s\n' "${added_pkg}" >> "${rc_preserved}"
+        continue
+    fi
+
+    echo "[PASS] Residual config purge safety gate: ${added_pkg}"
+
+    dpkg --purge "${added_pkg}"
+
+    for i in "${!shared_paths[@]}"; do
+        path="${shared_paths[$i]}"
+        expected="${shared_hashes[$i]}"
+
+        [[ -e "${path}" ]] ||
+            fail "Shared conffile disappeared after residual purge: ${path}"
+
+        current="$(md5sum "${path}" | awk '{print $1}')"
+
+        [[ "${current}" == "${expected}" ]] ||
+            fail "Shared conffile changed after residual purge: ${path}"
+    done
+
+    printf '%s\n' "${added_pkg}" >> "${rc_purged}"
+done < "${added}"
+
+echo "[PASS] Residual dpkg config cleanup completed"
 
 # Archive provenance instead of deleting profile history.
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"

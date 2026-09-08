@@ -183,12 +183,125 @@ grep -q 'Architecture preserved; required by another profile' \
     "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
     fail "cross-profile architecture preservation missing"
 
-grep -q 'Architecture preserved; installed packages still use it' \
+grep -q 'Architecture preserved; package not owned by profile' \
     "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
-    fail "installed-package architecture safety gate missing"
+    fail "unowned installed-package architecture safety gate missing"
 
 grep -q 'dpkg --remove-architecture' \
     "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
     fail "safe architecture cleanup missing"
+
+remove_engine="${ROOTFS}/usr/lib/iulinux/profile-remove"
+
+grep -qF 'package_id()' "${remove_engine}" ||
+    fail "architecture-aware package identity missing"
+
+grep -qF 'Foreign-architecture teardown safety gate' "${remove_engine}" ||
+    fail "foreign-architecture teardown safety gate missing"
+
+grep -qF 'Foreign-architecture teardown would remove another architecture' "${remove_engine}" ||
+    fail "cross-architecture teardown protection missing"
+
+grep -qF 'Foreign-architecture teardown would remove package not introduced by profile' "${remove_engine}" ||
+    fail "foreign-architecture provenance protection missing"
+
+grep -qF -- '--allow-remove-essential' "${remove_engine}" ||
+    fail "guarded foreign essential-package teardown missing"
+
+gate_line="$(grep -nF 'Foreign-architecture teardown safety gate' "${remove_engine}" | head -1 | cut -d: -f1)"
+override_line="$(grep -nF -- '--allow-remove-essential' "${remove_engine}" | head -1 | cut -d: -f1)"
+verify_line="$(grep -nF 'Foreign architecture still has installed packages after teardown' "${remove_engine}" | head -1 | cut -d: -f1)"
+remove_arch_line="$(grep -nF 'dpkg --remove-architecture' "${remove_engine}" | head -1 | cut -d: -f1)"
+
+[[ -n "${gate_line}" &&
+   -n "${override_line}" &&
+   -n "${verify_line}" &&
+   -n "${remove_arch_line}" &&
+   "${gate_line}" -lt "${override_line}" &&
+   "${override_line}" -lt "${verify_line}" &&
+   "${verify_line}" -lt "${remove_arch_line}" ]] ||
+    fail "foreign-architecture teardown safety ordering invalid"
+
+echo "[PASS] IULinux guarded foreign-architecture teardown policy"
+
+grep -qF 'Residual profile package cleanup safety gate' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual package cleanup safety gate missing"
+
+grep -qF 'Residual cleanup would remove package not introduced by profile' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual package provenance protection missing"
+
+grep -qF 'Residual profile package remains installed' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual package post-removal verification missing"
+
+grep -qF '"${pkg_arch}" == "${native_arch}" || "${pkg_arch}" == "all"' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual cleanup native/all architecture restriction missing"
+
+foreign_line="$(grep -nF 'Removed unused profile-added architecture' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+residual_line="$(grep -nF 'Residual profile package cleanup safety gate' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+archive_line="$(grep -nF 'Archive provenance instead of deleting profile history' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+
+[[ -n "${foreign_line}" &&
+   -n "${residual_line}" &&
+   -n "${archive_line}" &&
+   "${foreign_line}" -lt "${residual_line}" &&
+   "${residual_line}" -lt "${archive_line}" ]] ||
+    fail "residual cleanup safety ordering invalid"
+
+echo "[PASS] IULinux guarded residual package cleanup policy"
+
+grep -qF 'rc_purged="${state}/rc-purged"' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual config purge provenance missing"
+
+grep -qF 'rc_preserved="${state}/rc-preserved"' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual config preservation provenance missing"
+
+grep -qF '[[ "${status}" == rc* ]] || continue' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual config cleanup not restricted to rc state"
+
+grep -qF 'Residual config preserved; modified conffile' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "modified residual conffile preservation missing"
+
+grep -qF 'Residual config preserved; shared conffile ownership mismatch' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "shared residual conffile safety gate missing"
+
+grep -qF 'Shared conffile disappeared after residual purge' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "shared conffile post-purge existence verification missing"
+
+grep -qF 'Shared conffile changed after residual purge' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "shared conffile post-purge hash verification missing"
+
+grep -qF 'Residual dpkg config cleanup completed' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "residual dpkg config cleanup completion missing"
+
+residual_pkg_line="$(grep -nF 'Removed residual profile-added packages' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+rc_line="$(grep -nF 'Residual dpkg config cleanup completed' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+archive_line="$(grep -nF 'Archive provenance instead of deleting profile history' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" | head -1 | cut -d: -f1)"
+
+[[ -n "${residual_pkg_line}" &&
+   -n "${rc_line}" &&
+   -n "${archive_line}" &&
+   "${residual_pkg_line}" -lt "${rc_line}" &&
+   "${rc_line}" -lt "${archive_line}" ]] ||
+    fail "residual dpkg config cleanup ordering invalid"
+
+echo "[PASS] IULinux guarded residual dpkg config purge policy"
 
 echo "[PASS] IULinux profile architecture lifecycle policy"
