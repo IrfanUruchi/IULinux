@@ -6,6 +6,7 @@ trap 'echo "[IULinux] ERROR: overlay application failed at line ${LINENO}" >&2' 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ROOTFS_DIR="${PROJECT_ROOT}/build/rootfs"
 OVERLAY_DIR="${PROJECT_ROOT}/overlay"
+PROFILES_DIR="${PROJECT_ROOT}/profiles"
 
 if [[ ! -d "${ROOTFS_DIR}" ]]; then
     echo "[IULinux] Rootfs does not exist: ${ROOTFS_DIR}" >&2
@@ -45,6 +46,19 @@ sudo rsync \
     --chown=root:root \
     "${OVERLAY_DIR}/" \
     "${ROOTFS_DIR}/"
+
+
+echo "[IULinux] Staging optional profiles..."
+
+sudo mkdir -p "${ROOTFS_DIR}/usr/share/iulinux/profiles"
+
+sudo rsync \
+    -aH \
+    --delete \
+    --exclude='.gitkeep' \
+    --chown=root:root \
+    "${PROFILES_DIR}/" \
+    "${ROOTFS_DIR}/usr/share/iulinux/profiles/"
 
 # Netplan configuration must not be world-readable.
 if [[ -d "${ROOTFS_DIR}/etc/netplan" ]]; then
