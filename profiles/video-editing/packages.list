@@ -1,0 +1,16 @@
+# IULinux optional Video Editing profile
+
+# Editing
+kdenlive
+
+# Media processing
+ffmpeg
+
+# Media inspection
+mediainfo
+
+# Effects
+frei0r-plugins
+
+# Transcoding
+handbrake
