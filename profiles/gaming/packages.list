@@ -1,0 +1,15 @@
+# IULinux optional Gaming profile
+
+# Steam
+steam-installer
+steam-devices
+
+# Performance and diagnostics
+gamemode
+mangohud
+
+# Compositor / gaming session tooling
+gamescope
+
+# Vulkan post-processing
+vkbasalt
