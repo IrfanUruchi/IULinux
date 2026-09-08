@@ -1,0 +1,14 @@
+# IULinux optional Embedded Engineering profile
+
+# ARM bare-metal development
+gcc-arm-none-eabi
+gdb-multiarch
+
+# On-chip debugging and flashing
+openocd
+dfu-util
+avrdude
+
+# Serial development
+picocom
+python3-serial
