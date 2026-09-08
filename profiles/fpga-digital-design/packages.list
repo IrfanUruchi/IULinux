@@ -1,0 +1,19 @@
+# IULinux optional FPGA / Digital Design profile
+
+# HDL simulation
+iverilog
+verilator
+ghdl
+
+# Synthesis
+yosys
+
+# Waveform analysis
+gtkwave
+
+# Place and route
+nextpnr-ice40
+nextpnr-ecp5
+
+# FPGA programming
+openfpgaloader
