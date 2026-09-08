@@ -49,4 +49,20 @@ do
         fail "capability field missing: ${field}"
 done
 
+for mode in hybrid integrated nvidia; do
+    set +e
+    mode_output="$(
+        "${PROJECT_ROOT}/scripts/chroot-run.sh"             iulinux-gpu "${mode}" 2>&1
+    )"
+    rc=$?
+    set -e
+
+    (( rc != 0 )) ||
+        fail "${mode} unexpectedly changed GPU state"
+
+    grep -q '^\[FAIL\]' <<<"${mode_output}" ||
+        fail "${mode} did not fail closed"
+done
+
+echo "[PASS] IULinux GPU switching interface fails closed"
 echo "[PASS] IULinux GPU control foundation"

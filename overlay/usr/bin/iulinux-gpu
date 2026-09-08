@@ -72,6 +72,30 @@ show_capabilities()
     fi
 }
 
+request_mode()
+{
+    local requested="$1"
+    local count
+
+    count="$(gpu_count)"
+
+    if (( count <= 1 )); then
+        echo "[FAIL] GPU switching is unavailable on this system." >&2
+        echo "[INFO] Detected topology: single-GPU" >&2
+        return 10
+    fi
+
+    if ! has_nvidia || (! has_intel && ! has_amd); then
+        echo "[FAIL] No supported hybrid NVIDIA topology detected." >&2
+        return 11
+    fi
+
+    echo "[FAIL] GPU switching backend has not been runtime-verified on this hardware." >&2
+    echo "[INFO] Requested mode: ${requested}" >&2
+    echo "[INFO] No graphics state was changed." >&2
+    return 12
+}
+
 show_status()
 {
     echo "============================================"
@@ -114,10 +138,16 @@ case "${MODE}" in
     capabilities)
         show_capabilities
         ;;
+    hybrid|integrated|nvidia)
+        request_mode "${MODE}"
+        ;;
     *)
         echo "Usage:" >&2
         echo "  iulinux-gpu status" >&2
         echo "  iulinux-gpu capabilities" >&2
+        echo "  iulinux-gpu hybrid" >&2
+        echo "  iulinux-gpu integrated" >&2
+        echo "  iulinux-gpu nvidia" >&2
         exit 2
         ;;
 esac
