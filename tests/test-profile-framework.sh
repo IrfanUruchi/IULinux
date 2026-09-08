@@ -158,3 +158,37 @@ grep -q 'Dependency cleanup would remove package not introduced by profile' \
     fail "profile remover must contain exactly one archive block"
 
 echo "[PASS] IULinux profile lifecycle cleanup policy"
+
+grep -q 'architectures-requested' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "requested-architecture provenance missing"
+
+grep -q 'architectures-before' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "architecture baseline provenance missing"
+
+grep -q 'architectures-added' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "added-architecture provenance missing"
+
+grep -q 'dpkg --add-architecture' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "profile architecture enablement missing"
+
+grep -q 'Best-effort rollback of architectures introduced by a failed install' \
+    "${ROOTFS}/usr/bin/iulinux-profile" ||
+    fail "failed-install architecture rollback missing"
+
+grep -q 'Architecture preserved; required by another profile' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "cross-profile architecture preservation missing"
+
+grep -q 'Architecture preserved; installed packages still use it' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "installed-package architecture safety gate missing"
+
+grep -q 'dpkg --remove-architecture' \
+    "${ROOTFS}/usr/lib/iulinux/profile-remove" ||
+    fail "safe architecture cleanup missing"
+
+echo "[PASS] IULinux profile architecture lifecycle policy"

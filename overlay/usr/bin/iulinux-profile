@@ -57,6 +57,23 @@ read_packages()
         "${file}"
 }
 
+read_architectures()
+{
+    local file="${PROFILE_PATH}/architectures.list"
+
+    [[ -f "${file}" ]] || return 0
+
+    sed         -e 's/#.*$//'         -e '/^[[:space:]]*$/d'         "${file}"
+}
+
+snapshot_architectures()
+{
+    {
+        dpkg --print-architecture
+        dpkg --print-foreign-architectures
+    } | LC_ALL=C sort -u
+}
+
 profile_state_path()
 {
     echo "${STATE_DIR}/${PROFILE_ID}"
@@ -244,6 +261,14 @@ install_profile()
     fi
 
     mapfile -t packages < <(read_packages)
+    mapfile -t architectures < <(read_architectures)
+
+    for arch in "${architectures[@]}"; do
+        [[ "${arch}" =~ ^[a-z0-9][a-z0-9._-]*$ ]] || {
+            echo "[FAIL] Invalid architecture in profile: ${arch}" >&2
+            exit 8
+        }
+    done
 
     echo "============================================"
     echo " Installing IULinux profile: ${PROFILE_NAME}"
@@ -261,13 +286,47 @@ install_profile()
 
     cleanup()
     {
+        # Best-effort rollback of architectures introduced by a failed install.
+        if [[ -f "${tmp_state}/architectures-added" ]]; then
+            while IFS= read -r arch; do
+                [[ -n "${arch}" ]] || continue
+
+                dpkg --print-foreign-architectures |
+                    grep -qxF "${arch}" || continue
+
+                if ! dpkg-query -W                     -f='${Architecture} ${db:Status-Abbrev}\n'                     2>/dev/null |
+                    awk -v arch="${arch}"                         '$1 == arch && $2 == "ii" {found=1} END {exit !found}'
+                then
+                    dpkg --remove-architecture "${arch}"                         >/dev/null 2>&1 || true
+                fi
+            done < "${tmp_state}/architectures-added"
+        fi
+
         rm -rf "${tmp_state}" 2>/dev/null || true
     }
     trap cleanup EXIT
 
+    : > "${tmp_state}/architectures-requested"
+
+    if (( ${#architectures[@]} )); then
+        printf '%s\n' "${architectures[@]}" |
+            LC_ALL=C sort -u             > "${tmp_state}/architectures-requested"
+    fi
+
+    snapshot_architectures         > "${tmp_state}/architectures-before"
+
+    LC_ALL=C comm -12         "${tmp_state}/architectures-requested"         "${tmp_state}/architectures-before"         > "${tmp_state}/architectures-preexisting"
+
+    LC_ALL=C comm -23         "${tmp_state}/architectures-requested"         "${tmp_state}/architectures-before"         > "${tmp_state}/architectures-added"
+
+    while IFS= read -r arch; do
+        [[ -n "${arch}" ]] || continue
+        echo "[IULinux] Enabling architecture: ${arch}"
+        dpkg --add-architecture "${arch}"
+    done < "${tmp_state}/architectures-added"
+
     printf '%s\n' "${packages[@]}" |
-        LC_ALL=C sort -u \
-        > "${tmp_state}/packages-requested"
+        LC_ALL=C sort -u         > "${tmp_state}/packages-requested"
 
     snapshot_packages \
         > "${tmp_state}/packages-before"

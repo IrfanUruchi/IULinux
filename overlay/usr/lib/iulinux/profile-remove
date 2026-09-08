@@ -284,6 +284,56 @@ echo "Overlay files removed:    ${removed_overlay}"
 echo "Modified files preserved: ${preserved_overlay}"
 echo "[PASS] Profile overlay cleanup completed safely"
 
+# Remove foreign architectures introduced by this profile only when safe.
+architectures_added="${state}/architectures-added"
+
+if [[ -f "${architectures_added}" ]]; then
+    while IFS= read -r arch; do
+        [[ -n "${arch}" ]] || continue
+
+        # Native architecture must never be removed.
+        if [[ "${arch}" == "$(dpkg --print-architecture)" ]]; then
+            echo "[WARN] Refusing to remove native architecture: ${arch}"
+            continue
+        fi
+
+        # Preserve the architecture if another installed profile requests it.
+        required_elsewhere=0
+
+        for other_state in "${STATE_DIR}"/*; do
+            [[ -d "${other_state}" ]] || continue
+            [[ "${other_state}" != "${state}" ]] || continue
+            [[ -f "${other_state}/installed" ]] || continue
+            [[ -f "${other_state}/architectures-requested" ]] || continue
+
+            if grep -qxF "${arch}" "${other_state}/architectures-requested"; then
+                required_elsewhere=1
+                break
+            fi
+        done
+
+        if (( required_elsewhere == 1 )); then
+            echo "[INFO] Architecture preserved; required by another profile: ${arch}"
+            continue
+        fi
+
+        # dpkg cannot remove an architecture while installed packages still use it.
+        if dpkg-query -W \
+            -f='${Architecture} ${db:Status-Abbrev}\n' \
+            2>/dev/null |
+            awk -v arch="${arch}" '$1 == arch && $2 == "ii" {found=1} END {exit !found}'
+        then
+            echo "[INFO] Architecture preserved; installed packages still use it: ${arch}"
+            continue
+        fi
+
+        if dpkg --print-foreign-architectures | grep -qxF "${arch}"; then
+            dpkg --remove-architecture "${arch}"
+            echo "[PASS] Removed unused profile-added architecture: ${arch}"
+        fi
+    done < "${architectures_added}"
+fi
+
 # Archive provenance instead of deleting profile history.
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 history="${STATE_DIR}/history"
