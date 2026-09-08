@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODE="${1:-status}"
+
+gpu_lines()
+{
+    lspci -nnk 2>/dev/null |
+        grep -A3 -Ei 'VGA compatible controller|3D controller|Display controller'
+}
+
+has_nvidia()
+{
+    lspci -Dn 2>/dev/null |
+        awk '$2 ~ /^(0300|0302|0380):/ && $3 ~ /^10de:/ {found=1} END {exit !found}'
+}
+
+has_intel()
+{
+    lspci -Dn 2>/dev/null |
+        awk '$2 ~ /^(0300|0302|0380):/ && $3 ~ /^8086:/ {found=1} END {exit !found}'
+}
+
+has_amd()
+{
+    lspci -Dn 2>/dev/null |
+        awk '$2 ~ /^(0300|0302|0380):/ && $3 ~ /^1002:/ {found=1} END {exit !found}'
+}
+
+gpu_count()
+{
+    lspci -Dn 2>/dev/null |
+        awk '$2 ~ /^(0300|0302|0380):/ {count++} END {print count+0}'
+}
+
+show_capabilities()
+{
+    echo "============================================"
+    echo " IULinux Graphics Capabilities"
+    echo "============================================"
+    echo
+
+    count="$(gpu_count)"
+
+    printf "GPU count:          %s\n" "${count}"
+    printf "Intel GPU:          %s\n" "$(has_intel && echo yes || echo no)"
+    printf "AMD GPU:            %s\n" "$(has_amd && echo yes || echo no)"
+    printf "NVIDIA GPU:         %s\n" "$(has_nvidia && echo yes || echo no)"
+    printf "NVIDIA userspace:   %s\n" "$(command -v nvidia-smi >/dev/null 2>&1 && echo available || echo unavailable)"
+    printf "PRIME selector:     %s\n" "$(command -v prime-select >/dev/null 2>&1 && echo available || echo unavailable)"
+    printf "ASUS gfx backend:   %s\n" "$(command -v supergfxctl >/dev/null 2>&1 && echo available || echo unavailable)"
+
+    echo
+
+    if (( count <= 1 )); then
+        echo "Switch backend:     none required"
+        echo "Switching modes:    unavailable"
+    elif has_nvidia && (has_intel || has_amd); then
+        if command -v supergfxctl >/dev/null 2>&1; then
+            echo "Switch backend:     supergfxctl"
+            echo "Switching modes:    hardware/backend dependent"
+        elif command -v prime-select >/dev/null 2>&1; then
+            echo "Switch backend:     PRIME"
+            echo "Switching modes:    hybrid / integrated / nvidia candidate"
+        else
+            echo "Switch backend:     not configured"
+            echo "Switching modes:    detection only"
+        fi
+    else
+        echo "Switch backend:     unsupported topology"
+        echo "Switching modes:    unavailable"
+    fi
+}
+
+show_status()
+{
+    echo "============================================"
+    echo " IULinux Graphics"
+    echo "============================================"
+    echo
+
+    echo "Detected GPUs:"
+    gpu_lines | sed 's/^/  /'
+
+    echo
+    count="$(gpu_count)"
+
+    if (( count <= 1 )); then
+        echo "Topology:   single-GPU"
+        echo "Switching:  unavailable"
+    elif has_nvidia && (has_intel || has_amd); then
+        echo "Topology:   hybrid graphics"
+        echo "Switching:  capability detection pending"
+    else
+        echo "Topology:   multi-GPU"
+        echo "Switching:  capability detection pending"
+    fi
+
+    if command -v glxinfo >/dev/null 2>&1; then
+        renderer="$(
+            glxinfo -B 2>/dev/null |
+                awk -F': ' '/OpenGL renderer string:/ {print $2; exit}'
+        )"
+
+        [[ -n "${renderer}" ]] &&
+            echo "Renderer:   ${renderer}"
+    fi
+}
+
+case "${MODE}" in
+    status)
+        show_status
+        ;;
+    capabilities)
+        show_capabilities
+        ;;
+    *)
+        echo "Usage:" >&2
+        echo "  iulinux-gpu status" >&2
+        echo "  iulinux-gpu capabilities" >&2
+        exit 2
+        ;;
+esac
