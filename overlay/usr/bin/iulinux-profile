@@ -213,6 +213,15 @@ show_plan()
     read_packages | sed 's/^/  /'
 
     echo
+    echo "Required architectures:"
+
+    if [[ -f "${PROFILE_PATH}/architectures.list" ]]; then
+        read_architectures | sed 's/^/  /'
+    else
+        echo "  none"
+    fi
+
+    echo
     echo "Profile overlay:"
     echo "  ${PROFILE_PATH}/overlay"
     echo
