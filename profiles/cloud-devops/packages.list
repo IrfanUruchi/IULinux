@@ -1,0 +1,15 @@
+# IULinux optional Cloud / DevOps profile
+
+# Automation
+ansible-core
+ansible-lint
+
+# Cloud tooling
+awscli
+
+# OCI image workflows
+skopeo
+buildah
+
+# Buildah networking
+netavark
