@@ -51,6 +51,15 @@ package_id()
     fi
 }
 
+snapshot_packages()
+{
+    LC_ALL=C dpkg-query -W \
+        -f='${binary:Package} ${db:Status-Abbrev}\n' \
+        2>/dev/null |
+        awk '$2 == "ii" {print $1}' |
+        LC_ALL=C sort -u
+}
+
 mapfile -t owned_packages < "${owned}"
 installed_owned=()
 
@@ -168,6 +177,37 @@ echo "Overlay files modified:      ${modified_files}"
 echo "Overlay files already absent:${missing_files}"
 echo "[PASS] Overlay removal safety simulation"
 
+# Record the installed-package baseline at removal start. APT may install
+# replacement packages while removing profile-owned packages, so those must
+# gain their own removal-time provenance.
+removal_before="${state}/packages-removal-before"
+removal_added="${state}/packages-removal-added"
+
+snapshot_packages > "${removal_before}"
+: > "${removal_added}"
+
+record_removal_added_packages()
+{
+    local current newly merged
+
+    current="$(mktemp)"
+    newly="$(mktemp)"
+    merged="$(mktemp)"
+
+    snapshot_packages > "${current}"
+
+    LC_ALL=C comm -13 \
+        "${removal_before}" \
+        "${current}" \
+        > "${newly}"
+
+    cat "${removal_added}" "${newly}" |
+        LC_ALL=C sort -u > "${merged}"
+
+    mv "${merged}" "${removal_added}"
+    rm -f "${current}" "${newly}"
+}
+
 # Apply profile-specific shutdown policy before package removal.
 if [[ -x "${profile}/pre-remove" ]]; then
     echo
@@ -186,6 +226,8 @@ if (( ${#installed_owned[@]} )); then
 else
     echo "[INFO] No profile-owned explicit packages remain installed."
 fi
+
+record_removal_added_packages
 
 echo "[PASS] Explicit profile packages removed safely"
 # Remove only unused dependencies introduced by this profile.
@@ -245,6 +287,8 @@ if (( ${#safe_candidates[@]} )); then
 else
     echo "[INFO] No unused profile-added dependencies require cleanup."
 fi
+
+record_removal_added_packages
 
 # Remove profile overlay files only if they are byte-for-byte unchanged.
 removed_overlay=0
@@ -427,6 +471,8 @@ if [[ -f "${architectures_added}" ]]; then
     done < "${architectures_added}"
 fi
 
+record_removal_added_packages
+
 # Remove any remaining native/all-architecture packages introduced by
 # this profile when APT proves the teardown cannot touch outside provenance.
 native_arch="$(dpkg --print-architecture)"
@@ -495,6 +541,92 @@ if (( ${#residual_candidates[@]} )); then
 else
     echo "[INFO] No residual profile-added packages require cleanup."
 fi
+
+record_removal_added_packages
+
+# APT can install replacement packages while removing profile-owned packages.
+# Remove only packages that were absent at removal start and were observed
+# during teardown. Repeat so replacement-of-replacement transactions are
+# handled without escaping provenance.
+cleanup_removal_added_packages()
+{
+    local pass=0
+    local simulation planned planned_id allowed pkg status
+    local -a candidates planned_packages
+
+    while :; do
+        record_removal_added_packages
+        candidates=()
+
+        while IFS= read -r pkg; do
+            [[ -n "${pkg}" ]] || continue
+
+            status="$(
+                dpkg-query -W -f='${db:Status-Abbrev}' \
+                    "${pkg}" 2>/dev/null || true
+            )"
+
+            [[ "${status}" == ii* ]] || continue
+            candidates+=("${pkg}")
+        done < "${removal_added}"
+
+        (( ${#candidates[@]} )) || break
+
+        pass=$((pass + 1))
+        (( pass <= 16 )) ||
+            fail "Removal-introduced package cleanup exceeded safety limit"
+
+        simulation="$(
+            LC_ALL=C apt-get -s remove --no-auto-remove \
+                "${candidates[@]}"
+        )"
+
+        mapfile -t planned_packages < <(
+            awk '/^Remv / {print $2}' <<<"${simulation}"
+        )
+
+        (( ${#planned_packages[@]} )) ||
+            fail "Removal-introduced package cleanup produced no removal plan"
+
+        for planned in "${planned_packages[@]}"; do
+            planned_id="$(package_id "${planned}")"
+            allowed=0
+
+            while IFS= read -r pkg; do
+                [[ -n "${pkg}" ]] || continue
+
+                if [[ "${planned_id}" == "$(package_id "${pkg}")" ]]; then
+                    allowed=1
+                    break
+                fi
+            done < "${removal_added}"
+
+            (( allowed == 1 )) ||
+                fail "Removal-added cleanup would remove package not introduced during removal: ${planned}"
+        done
+
+        echo "[PASS] Removal-added package cleanup safety gate"
+
+        LC_ALL=C apt-get remove -y --no-auto-remove \
+            "${candidates[@]}"
+
+        record_removal_added_packages
+
+        for pkg in "${candidates[@]}"; do
+            status="$(
+                dpkg-query -W -f='${db:Status-Abbrev}' \
+                    "${pkg}" 2>/dev/null || true
+            )"
+
+            [[ "${status}" != ii* ]] ||
+                fail "Removal-added package remains installed: ${pkg}"
+        done
+    done
+
+    echo "[PASS] Removal-introduced package cleanup completed"
+}
+
+cleanup_removal_added_packages
 
 # Purge residual dpkg config records introduced by this profile only when
 # all remaining conffiles are absent or byte-for-byte unchanged.
@@ -605,7 +737,10 @@ while IFS= read -r added_pkg; do
     done
 
     printf '%s\n' "${added_pkg}" >> "${rc_purged}"
-done < "${added}"
+done < <(
+    cat "${added}" "${removal_added}" |
+        LC_ALL=C sort -u
+)
 
 echo "[PASS] Residual dpkg config cleanup completed"
 

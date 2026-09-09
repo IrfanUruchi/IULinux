@@ -304,4 +304,50 @@ archive_line="$(grep -nF 'Archive provenance instead of deleting profile history
 
 echo "[PASS] IULinux guarded residual dpkg config purge policy"
 
+grep -qF 'packages-removal-before' "${remove_engine}" ||
+    fail "removal-start package provenance missing"
+
+grep -qF 'packages-removal-added' "${remove_engine}" ||
+    fail "removal-introduced package provenance missing"
+
+grep -qF 'record_removal_added_packages()' "${remove_engine}" ||
+    fail "removal-introduced package detection missing"
+
+grep -qF 'cleanup_removal_added_packages()' "${remove_engine}" ||
+    fail "removal-introduced package cleanup missing"
+
+grep -qF 'Removal-added package cleanup safety gate' "${remove_engine}" ||
+    fail "removal-introduced package safety gate missing"
+
+grep -qF 'Removal-added cleanup would remove package not introduced during removal' "${remove_engine}" ||
+    fail "removal-introduced provenance protection missing"
+
+grep -qF 'Removal-added package remains installed' "${remove_engine}" ||
+    fail "removal-introduced package verification missing"
+
+grep -qF 'Removal-introduced package cleanup completed' "${remove_engine}" ||
+    fail "removal-introduced cleanup completion missing"
+
+grep -qF 'cat "${added}" "${removal_added}"' "${remove_engine}" ||
+    fail "removal-introduced rc purge provenance missing"
+
+removal_added_line="$(
+    grep -nF 'Removal-introduced package cleanup completed'         "${remove_engine}" | head -1 | cut -d: -f1
+)"
+rc_line="$(
+    grep -nF 'Residual dpkg config cleanup completed'         "${remove_engine}" | head -1 | cut -d: -f1
+)"
+archive_line="$(
+    grep -nF 'Archive provenance instead of deleting profile history'         "${remove_engine}" | head -1 | cut -d: -f1
+)"
+
+[[ -n "${removal_added_line}" &&
+   -n "${rc_line}" &&
+   -n "${archive_line}" &&
+   "${removal_added_line}" -lt "${rc_line}" &&
+   "${rc_line}" -lt "${archive_line}" ]] ||
+    fail "removal-introduced package cleanup safety ordering invalid"
+
+echo "[PASS] IULinux removal-introduced package lifecycle policy"
+
 echo "[PASS] IULinux profile architecture lifecycle policy"
