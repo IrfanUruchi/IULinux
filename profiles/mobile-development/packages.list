@@ -1,0 +1,12 @@
+# IULinux optional Mobile Development profile
+
+# Android device tooling
+adb
+fastboot
+android-sdk-platform-tools-common
+
+# Java development
+openjdk-21-jdk
+
+# Physical device development
+scrcpy
