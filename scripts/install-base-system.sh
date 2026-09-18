@@ -82,19 +82,6 @@ echo "[IULinux] Cleaning package cache..."
 cleanup
 trap - EXIT
 
-# apt/base-files may restore Ubuntu-owned identity files.
-# The IULinux layer is therefore intentionally applied last.
-echo
-echo "[IULinux] Re-applying IULinux identity overlay..."
-
-"${PROJECT_ROOT}/scripts/apply-overlay.sh"
-
-echo
-echo "[IULinux] Validating identity..."
-
-"${PROJECT_ROOT}/tests/test-rootfs-identity.sh"
-
-echo
 echo "============================================"
 echo " IULinux base system COMPLETE"
 echo "============================================"

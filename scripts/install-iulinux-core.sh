@@ -130,6 +130,10 @@ echo "[IULinux] Installed core packages:"
     iulinux-update
 
 echo
+echo "[IULinux] Validating installed IULinux identity..."
+"${PROJECT_ROOT}/tests/test-rootfs-identity.sh"
+
+echo
 echo "============================================"
 echo " IULinux core COMPLETE"
 echo "============================================"
