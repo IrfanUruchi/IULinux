@@ -1,0 +1,39 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    install|upgrade)
+        owner="$(dpkg-divert --listpackage /usr/lib/os-release 2>/dev/null || true)"
+
+        if [ -n "$owner" ] && [ "$owner" != "iulinux-release" ]; then
+            echo "iulinux-release: /usr/lib/os-release is already diverted by $owner" >&2
+            exit 1
+        fi
+
+        if [ -z "$owner" ]; then
+            upstream="/usr/lib/os-release.iulinux-upstream"
+
+            rm -f "$upstream"
+
+            if grep -qx 'ID=iulinux' /usr/lib/os-release 2>/dev/null &&
+               [ -f /usr/lib/iulinux/upstream-os-release ] &&
+               [ ! -L /usr/lib/iulinux/upstream-os-release ]; then
+                cp -a /usr/lib/iulinux/upstream-os-release "$upstream"
+            elif [ -f /usr/lib/os-release ]; then
+                cp -a /usr/lib/os-release "$upstream"
+            else
+                echo "iulinux-release: cannot preserve upstream os-release" >&2
+                exit 1
+            fi
+
+            dpkg-divert \
+                --package iulinux-release \
+                --add \
+                --no-rename \
+                --divert "$upstream" \
+                /usr/lib/os-release
+        fi
+        ;;
+esac
+
+exit 0

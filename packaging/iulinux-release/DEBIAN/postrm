@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove)
+        owner="$(dpkg-divert --listpackage /usr/lib/os-release 2>/dev/null || true)"
+        upstream="/usr/lib/os-release.iulinux-upstream"
+
+        if [ "$owner" = "iulinux-release" ]; then
+            dpkg-divert \
+                --package iulinux-release \
+                --remove \
+                --no-rename \
+                --divert "$upstream" \
+                /usr/lib/os-release
+
+            if [ -f "$upstream" ]; then
+                rm -f /usr/lib/os-release
+                mv "$upstream" /usr/lib/os-release
+            fi
+        fi
+        ;;
+esac
+
+exit 0
