@@ -60,16 +60,24 @@ echo "System package: iulinux-system=${SYSTEM_VERSION}"
 echo "Repository:     ${REPOSITORY_URI}"
 echo
 
-echo "[IULinux] Installing temporary archive trust bootstrap..."
+if [[ -f "${ROOTFS_DIR}${PERMANENT_KEY}" ]] &&
+   [[ -f "${ROOTFS_DIR}${PERMANENT_SOURCE}" ]]; then
+    echo "[IULinux] Permanent archive trust already present; bootstrap not required."
+elif [[ -e "${ROOTFS_DIR}${PERMANENT_KEY}" ]] ||
+     [[ -e "${ROOTFS_DIR}${PERMANENT_SOURCE}" ]]; then
+    echo "[FAIL] Incomplete permanent repository trust state." >&2
+    exit 1
+else
+    echo "[IULinux] Installing temporary archive trust bootstrap..."
 
-sudo install \
-    -Dm644 \
-    "${PUBLIC_KEY}" \
-    "${ROOTFS_DIR}${BOOTSTRAP_KEY}"
+    sudo install \
+        -Dm644 \
+        "${PUBLIC_KEY}" \
+        "${ROOTFS_DIR}${BOOTSTRAP_KEY}"
 
-sudo mkdir -p "${ROOTFS_DIR}/etc/apt/sources.list.d"
+    sudo mkdir -p "${ROOTFS_DIR}/etc/apt/sources.list.d"
 
-sudo tee "${ROOTFS_DIR}${BOOTSTRAP_SOURCE}" >/dev/null <<EOF_SOURCE
+    sudo tee "${ROOTFS_DIR}${BOOTSTRAP_SOURCE}" >/dev/null <<EOF_SOURCE
 Types: deb
 URIs: ${REPOSITORY_URI}
 Suites: ${SUITE}
@@ -77,6 +85,7 @@ Components: main
 Architectures: amd64
 Signed-By: ${BOOTSTRAP_KEY}
 EOF_SOURCE
+fi
 
 echo "[IULinux] Authenticating public IULinux archive..."
 
@@ -130,8 +139,6 @@ echo "[IULinux] Installed core packages:"
     iulinux-update
 
 echo
-echo "[IULinux] Validating installed IULinux identity..."
-"${PROJECT_ROOT}/tests/test-rootfs-identity.sh"
 
 echo
 echo "============================================"

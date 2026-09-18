@@ -104,6 +104,8 @@ SOURCES
 # remains the single authoritative repository configuration.
 sudo rm -f "${ROOTFS_DIR}/etc/apt/sources.list"
 
+echo "iulinux" | sudo tee "${ROOTFS_DIR}/etc/hostname" >/dev/null
+
 echo
 echo "[IULinux] Writing build metadata..."
 
