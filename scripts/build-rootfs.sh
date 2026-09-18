@@ -9,6 +9,7 @@ MODE="${1:-}"
 STAGES=(
     bootstrap-rootfs.sh
     install-base-system.sh
+    install-iulinux-core.sh
     install-desktop.sh
     install-developer.sh
     install-containers.sh
@@ -88,6 +89,7 @@ run_stage()
 
 run_stage bootstrap-rootfs.sh
 run_stage install-base-system.sh
+run_stage install-iulinux-core.sh
 run_stage install-desktop.sh
 run_stage install-developer.sh
 run_stage install-containers.sh
