@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+RELEASE_FILE="/usr/lib/iulinux/release"
+
+usage()
+{
+    cat <<'USAGE'
+Usage:
+  iulinux-update version
+  iulinux-update check
+  iulinux-update upgrade
+USAGE
+}
+
+require_root()
+{
+    if [[ "${EUID}" -ne 0 ]]; then
+        echo "[FAIL] This operation requires root privileges."
+        echo "Run: sudo iulinux-update $1"
+        exit 1
+    fi
+}
+
+show_version()
+{
+    if [[ ! -r "${RELEASE_FILE}" ]]; then
+        echo "[FAIL] IULinux release metadata is unavailable."
+        exit 1
+    fi
+
+    # shellcheck disable=SC1090
+    source "${RELEASE_FILE}"
+
+    echo "IULinux ${IULINUX_VERSION} ${IULINUX_RELEASE}"
+    echo "Channel: ${IULINUX_CHANNEL}"
+    echo "Base:    Ubuntu ${IULINUX_BASE_VERSION} (${IULINUX_BASE_CODENAME})"
+}
+
+check_updates()
+{
+    require_root check
+
+    echo "============================================"
+    echo " IULinux Update Check"
+    echo "============================================"
+
+    apt-get update
+
+    echo
+    echo "Upgrade simulation:"
+    apt-get -s full-upgrade
+}
+
+perform_upgrade()
+{
+    require_root upgrade
+
+    echo "============================================"
+    echo " IULinux System Upgrade"
+    echo "============================================"
+
+    apt-get update
+    apt-get full-upgrade
+
+    echo
+    echo "============================================"
+    echo " IULinux Update Complete"
+    echo "============================================"
+
+    if [[ -f /var/run/reboot-required ]]; then
+        echo "A reboot is required."
+    else
+        echo "No reboot is currently required."
+    fi
+}
+
+case "${1:-}" in
+    version)
+        show_version
+        ;;
+    check)
+        check_updates
+        ;;
+    upgrade)
+        perform_upgrade
+        ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        usage
+        exit 2
+        ;;
+esac

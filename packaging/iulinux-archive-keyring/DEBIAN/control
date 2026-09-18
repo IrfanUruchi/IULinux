@@ -1,0 +1,9 @@
+Package: iulinux-archive-keyring
+Version: 0.1~alpha1-2
+Architecture: all
+Maintainer: IULinux Project
+Section: admin
+Priority: important
+Description: IULinux APT archive public signing keys
+ Provides the public keyring used by APT to authenticate packages
+ distributed through official IULinux repositories.

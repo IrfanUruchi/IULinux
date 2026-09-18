@@ -1,0 +1,9 @@
+Package: iulinux-release
+Version: 0.1~alpha1-1
+Architecture: all
+Maintainer: IULinux Project
+Section: admin
+Priority: optional
+Description: IULinux release identity and update channel metadata
+ Provides the installed IULinux release version, channel, and Ubuntu base
+ information used by IULinux system and update tooling.

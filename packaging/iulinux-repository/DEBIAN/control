@@ -1,0 +1,10 @@
+Package: iulinux-repository
+Version: 0.1~alpha1-1
+Architecture: all
+Maintainer: IULinux Project
+Section: admin
+Priority: important
+Depends: iulinux-archive-keyring (>= 0.1~alpha1-2)
+Description: IULinux official APT repository configuration
+ Provides the authenticated APT source configuration used to receive
+ official IULinux system and application updates.

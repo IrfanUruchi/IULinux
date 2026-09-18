@@ -1,0 +1,10 @@
+Package: iulinux-update
+Version: 0.1~alpha1-1
+Architecture: all
+Maintainer: IULinux Project
+Section: admin
+Priority: optional
+Depends: apt, iulinux-release
+Description: IULinux system update command
+ Provides a thin IULinux interface over the standard APT update and
+ full-upgrade workflow.

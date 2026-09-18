@@ -1,0 +1,6 @@
+Types: deb
+URIs: @IULINUX_REPOSITORY_URI@
+Suites: resolute-alpha
+Components: main
+Architectures: amd64
+Signed-By: /usr/share/keyrings/iulinux-archive-keyring.gpg

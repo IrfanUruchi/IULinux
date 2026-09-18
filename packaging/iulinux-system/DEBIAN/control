@@ -1,0 +1,11 @@
+Package: iulinux-system
+Version: 0.1~alpha1-2
+Architecture: all
+Maintainer: IULinux Project
+Section: metapackages
+Priority: important
+Depends: iulinux-release (= 0.1~alpha1-1), iulinux-update (= 0.1~alpha1-1), iulinux-repository (= 0.1~alpha1-1), iulinux-archive-keyring (>= 0.1~alpha1-2)
+Description: IULinux supported system metapackage
+ Tracks the core IULinux components required for a supported installation.
+ Upgrading this package allows existing installations to gain new mandatory
+ IULinux components without reinstalling the operating system.
