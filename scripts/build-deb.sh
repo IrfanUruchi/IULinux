@@ -3,13 +3,13 @@ set -Eeuo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-[[ $# -eq 1 ]] || {
-    echo "Usage: $0 <package-name>"
+[[ $# -ge 1 && $# -le 2 ]] || {
+    echo "Usage: $0 <package-name> [source-dir]"
     exit 2
 }
 
 name="$1"
-src="${PROJECT_ROOT}/packaging/${name}"
+src="${2:-${PROJECT_ROOT}/packaging/${name}}"
 control="${src}/DEBIAN/control"
 rootfs="${src}/rootfs"
 

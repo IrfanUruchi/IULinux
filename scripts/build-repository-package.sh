@@ -15,20 +15,31 @@ URI="${1:-}"
     exit 1
 }
 
-template="${PROJECT_ROOT}/packaging/iulinux-repository/templates/iulinux.sources"
-output="${PROJECT_ROOT}/packaging/iulinux-repository/rootfs/etc/apt/sources.list.d/iulinux.sources"
+src="${PROJECT_ROOT}/packaging/iulinux-repository"
+template="${src}/templates/iulinux.sources"
+stage="$(mktemp -d)"
+output="${stage}/rootfs/etc/apt/sources.list.d/iulinux.sources"
+
+cleanup()
+{
+    rm -rf "${stage}"
+}
+trap cleanup EXIT
 
 [[ -f "${template}" ]] || {
     echo "[FAIL] Missing repository source template."
     exit 1
 }
 
+cp -a "${src}/." "${stage}/"
 mkdir -p "$(dirname "${output}")"
 
 sed "s|@IULINUX_REPOSITORY_URI@|${URI}|g" \
     "${template}" > "${output}"
 
-"${PROJECT_ROOT}/scripts/build-deb.sh" iulinux-repository
+"${PROJECT_ROOT}/scripts/build-deb.sh" \
+    iulinux-repository \
+    "${stage}"
 
 echo "[PASS] Built IULinux repository bootstrap"
 echo "URI: ${URI}"
