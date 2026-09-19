@@ -82,9 +82,41 @@ command -v desktopeditors >/dev/null \
     && pass "ONLYOFFICE available" \
     || fail "ONLYOFFICE missing"
 
-command -v plasma-systemmonitor >/dev/null \
-    && pass "System Monitor available" \
-    || fail "System Monitor missing"
+command -v resources >/dev/null \
+    && pass "Resources monitor available" \
+    || fail "Resources monitor missing"
+
+
+[[ -x /usr/lib/iulinux/iulinux-performance-status ]] \
+    && pass "IULinux performance telemetry available" \
+    || fail "IULinux performance telemetry missing"
+
+
+command -v iulinux-settings >/dev/null \
+    && pass "IULinux Settings available" \
+    || fail "IULinux Settings missing"
+
+[[ -f /usr/share/applications/com.iulinux.Settings.desktop ]] \
+    && pass "IULinux Settings desktop entry available" \
+    || fail "IULinux Settings desktop entry missing"
+
+
+for pkg in konsole konsole-kpart plasma-systemmonitor gnome-system-monitor; do
+    status="$(dpkg-query -W -f='${db:Status-Abbrev}' "${pkg}" 2>/dev/null || true)"
+
+    [[ "${status}" != "ii " ]] \
+        && pass "${pkg} absent" \
+        || fail "${pkg} unexpectedly installed"
+done
+
+terminal="$(
+    update-alternatives --query x-terminal-emulator 2>/dev/null |
+    awk '/^Value:/ {print $2; exit}'
+)"
+
+[[ "${terminal}" == "/usr/bin/gnome-terminal.wrapper" ]] \
+    && pass "GNOME Terminal is the default terminal" \
+    || fail "GNOME Terminal is not the default terminal"
 
 command -v docker >/dev/null \
     && pass "Docker CLI available" \

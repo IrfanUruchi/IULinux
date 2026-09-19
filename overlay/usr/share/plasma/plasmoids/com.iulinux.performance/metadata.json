@@ -1,0 +1,17 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "IULinux Project"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Compact IULinux workstation performance and graphics status",
+        "Icon": "utilities-system-monitor",
+        "Id": "com.iulinux.performance",
+        "License": "GPL-3.0-or-later",
+        "Name": "IULinux Performance"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}

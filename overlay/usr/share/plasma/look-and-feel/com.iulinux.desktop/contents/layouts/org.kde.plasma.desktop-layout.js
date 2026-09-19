@@ -6,53 +6,101 @@ for (const desktop of desktops()) {
         "org.kde.image",
         "General"
     ];
+
     desktop.writeConfig(
         "Image",
         "file:///usr/share/wallpapers/IULinux/contents/images/3840x2160.png"
     );
 }
 
-// IULinux Premium Workstation Layout
-// Plasma 6
+// IULinux workstation dock
+//
+// One physical Plasma panel.
+//
+// Performance, applications and system status remain separate
+// logical sections, but share one baseline and one visibility state.
 
-// The IULinux global theme owns the initial panel layout.
 for (const oldPanel of panels()) {
     oldPanel.remove();
 }
 
-const panel = new Panel;
+const screenWidth = screenGeometry(0).width;
 
-panel.location = "bottom";
-panel.height = 48;
-panel.alignment = "center";
-panel.hiding = "none";
-panel.lengthMode = "fit";
+const panelHeight =
+    screenWidth >= 1800 ? 48 :
+    screenWidth >= 1200 ? 44 :
+                          40;
 
-// Plasma stores floating-view behavior in plasmashellrc.
+const panelThickness = Math.max(
+    36,
+    panelHeight - 4
+);
+
 const plasmaViews = new ConfigFile(
     "plasmashellrc",
     "PlasmaViews"
 );
+
+const panel = new Panel;
+
+panel.location = "bottom";
+panel.height = panelHeight;
+panel.alignment = "center";
+panel.lengthMode = "fit";
+panel.hiding = "autohide";
 
 const panelView = new ConfigFile(
     plasmaViews,
     "Panel " + panel.id
 );
 
-panelView.writeEntry("floating", "1");
+panelView.writeEntry(
+    "floating",
+    "1"
+);
 
 const panelDefaults = new ConfigFile(
     panelView,
     "Defaults"
 );
 
-panelDefaults.writeEntry("thickness", "44");
+panelDefaults.writeEntry(
+    "thickness",
+    panelThickness
+);
+
+function addGap() {
+    const gap = panel.addWidget(
+        "org.kde.plasma.panelspacer"
+    );
+
+    gap.currentConfigGroup = [
+        "General"
+    ];
+
+    gap.writeConfig(
+        "expanding",
+        false
+    );
+
+    gap.writeConfig(
+        "length",
+        20
+    );
+
+    return gap;
+}
 
 
-// ---------------------------------------------------------
-// IU launcher
-// ---------------------------------------------------------
+// Performance
+panel.addWidget(
+    "com.iulinux.performance"
+);
 
+addGap();
+
+
+// Applications
 const launcher = panel.addWidget(
     "org.kde.plasma.kickoff"
 );
@@ -64,11 +112,6 @@ launcher.writeConfig(
 
 launcher.globalShortcut = "Alt+F1";
 
-
-// ---------------------------------------------------------
-// Application / task area
-// ---------------------------------------------------------
-
 const tasks = panel.addWidget(
     "org.kde.plasma.icontasks"
 );
@@ -78,44 +121,20 @@ tasks.writeConfig(
     [
         "applications:brave-browser.desktop",
         "applications:org.kde.dolphin.desktop",
-        "applications:org.kde.konsole.desktop",
-        "applications:systemsettings.desktop"
+        "applications:org.gnome.Terminal.desktop",
+        "applications:com.iulinux.Settings.desktop"
     ]
 );
 
+addGap();
 
-// ---------------------------------------------------------
-// Right-side status island
-// ---------------------------------------------------------
 
-const statusPanel = new Panel;
-
-statusPanel.location = "bottom";
-statusPanel.height = 48;
-statusPanel.alignment = "right";
-statusPanel.hiding = "none";
-statusPanel.lengthMode = "fit";
-statusPanel.offset = 24;
-
-const statusView = new ConfigFile(
-    plasmaViews,
-    "Panel " + statusPanel.id
-);
-
-statusView.writeEntry("floating", "1");
-
-const statusDefaults = new ConfigFile(
-    statusView,
-    "Defaults"
-);
-
-statusDefaults.writeEntry("thickness", "44");
-
-statusPanel.addWidget(
+// System status
+panel.addWidget(
     "org.kde.plasma.systemtray"
 );
 
-const clock = statusPanel.addWidget(
+const clock = panel.addWidget(
     "org.kde.plasma.digitalclock"
 );
 
@@ -125,10 +144,20 @@ clock.currentConfigGroup = [
 
 clock.writeConfig(
     "showDate",
-    "false"
+    false
 );
 
 clock.writeConfig(
     "showSeconds",
-    "false"
+    0
+);
+
+clock.writeConfig(
+    "autoFontAndSize",
+    false
+);
+
+clock.writeConfig(
+    "fontSize",
+    9
 );
