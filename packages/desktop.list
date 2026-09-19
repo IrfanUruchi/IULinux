@@ -15,14 +15,18 @@ fonts-noto-core
 # IULinux KDE Plasma desktop
 # Keep applications intentionally minimal here.
 kinfocenter
-konsole
+gnome-terminal
+resources
+btop
+qml6-module-org-kde-plasma-plasma5support
+python3-minimal
 kwin-wayland
 pipewire
 pipewire-pulse
 plasma-desktop
 plasma-nm
 plasma-pa
-plasma-systemmonitor
+systemd-timesyncd
 plasma-session-wayland
 # Plasma shell / workspace
 plasma-workspace

@@ -90,6 +90,33 @@ echo "[IULinux] Installing KDE Plasma desktop..."
         "${PACKAGES[@]}"
 
 echo
+echo "[IULinux] Removing superseded desktop applications..."
+
+"${CHROOT_RUN}" \
+    /usr/bin/env \
+    DEBIAN_FRONTEND=noninteractive \
+    apt-get purge \
+        -y \
+        konsole \
+        konsole-kpart \
+        plasma-systemmonitor \
+        gnome-system-monitor
+
+echo
+echo "[IULinux] Selecting GNOME Terminal as the system terminal..."
+
+"${CHROOT_RUN}" /bin/bash -eu -c '
+terminal="/usr/bin/gnome-terminal.wrapper"
+
+if [[ ! -x "${terminal}" ]]; then
+    echo "[IULinux] GNOME Terminal alternative missing: ${terminal}" >&2
+    exit 1
+fi
+
+update-alternatives --set x-terminal-emulator "${terminal}"
+'
+
+echo
 echo "[IULinux] Enabling graphical boot target..."
 
 sudo ln -sfn \
