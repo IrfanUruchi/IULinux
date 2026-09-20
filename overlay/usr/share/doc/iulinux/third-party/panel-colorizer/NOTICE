@@ -1,0 +1,8 @@
+Panel Colorizer
+Version: 8.0.0
+Author: Luis Bocanegra
+License: GPL-3.0
+Upstream: https://github.com/luisbocanegra/plasma-panel-colorizer
+
+IULinux ships the Plasma applet package only.
+The optional C++ plugin is not included.

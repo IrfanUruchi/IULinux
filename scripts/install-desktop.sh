@@ -100,20 +100,23 @@ echo "[IULinux] Removing superseded desktop applications..."
         konsole \
         konsole-kpart \
         plasma-systemmonitor \
-        gnome-system-monitor
+        gnome-system-monitor \
+        gnome-terminal
 
 echo
-echo "[IULinux] Selecting GNOME Terminal as the system terminal..."
+echo "[IULinux] Selecting Ptyxis as the system terminal..."
 
 "${CHROOT_RUN}" /bin/bash -eu -c '
-terminal="/usr/bin/gnome-terminal.wrapper"
+terminal="/usr/bin/xdg-terminal-exec"
 
 if [[ ! -x "${terminal}" ]]; then
-    echo "[IULinux] GNOME Terminal alternative missing: ${terminal}" >&2
+    echo "[IULinux] xdg-terminal-exec missing: ${terminal}" >&2
     exit 1
 fi
 
-update-alternatives --set x-terminal-emulator "${terminal}"
+update-alternatives --install     /usr/bin/x-terminal-emulator     x-terminal-emulator     "${terminal}"     60
+
+update-alternatives --set     x-terminal-emulator     "${terminal}"
 '
 
 echo

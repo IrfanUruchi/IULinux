@@ -85,7 +85,7 @@ function addGap() {
 
     gap.writeConfig(
         "length",
-        20
+        40
     );
 
     return gap;
@@ -116,12 +116,14 @@ const tasks = panel.addWidget(
     "org.kde.plasma.icontasks"
 );
 
+tasks.currentConfigGroup = ["General"];
+
 tasks.writeConfig(
     "launchers",
     [
         "applications:brave-browser.desktop",
         "applications:org.kde.dolphin.desktop",
-        "applications:org.gnome.Terminal.desktop",
+        "applications:org.gnome.Ptyxis.desktop",
         "applications:com.iulinux.Settings.desktop"
     ]
 );
@@ -160,4 +162,51 @@ clock.writeConfig(
 clock.writeConfig(
     "fontSize",
     9
+);
+
+
+// IULinux panel appearance controller.
+// QML applet only; optional upstream C++ plugin is not shipped.
+const colorizer = panel.addWidget(
+    "luisbocanegra.panel.colorizer"
+);
+
+colorizer.currentConfigGroup = ["General"];
+
+colorizer.writeConfig(
+    "isEnabled",
+    true
+);
+
+colorizer.writeConfig(
+    "hideWidget",
+    true
+);
+
+colorizer.writeConfig(
+    "islandsEnabled",
+    true
+);
+
+colorizer.writeConfig(
+    "islandSeparatorWidget",
+    "org.kde.plasma.panelspacer"
+);
+
+colorizer.writeConfig(
+    "islandSeparatorPairing",
+    false
+);
+
+colorizer.writeConfig(
+    "blacklistIslandSeparator",
+    true
+);
+
+colorizer.writeConfig(
+    "presetAutoloading",
+    JSON.stringify({
+        enabled: true,
+        normal: "/usr/share/plasma/plasmoids/luisbocanegra.panel.colorizer/contents/ui/presets/IULinux Dock"
+    })
 );
