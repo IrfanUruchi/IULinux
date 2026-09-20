@@ -1,0 +1,12 @@
+[Common]
+OutlineCloseButton=false
+OutlineEnabled=true
+RoundedCorners=true
+ShadowSize=ShadowLarge
+ShadowStrength=200
+
+[Windeco]
+TitleAlignment=AlignCenterFullWidth
+ButtonSize=ButtonSmall
+DrawBackgroundGradient=false
+DrawBorderOnMaximizedWindows=false

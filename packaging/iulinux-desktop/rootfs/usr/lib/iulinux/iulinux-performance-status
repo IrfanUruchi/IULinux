@@ -1,0 +1,193 @@
+#!/usr/bin/python3
+
+import json
+import os
+import subprocess
+import time
+from pathlib import Path
+
+
+def read_cpu():
+    def sample():
+        fields = Path("/proc/stat").read_text().splitlines()[0].split()[1:]
+        values = [int(v) for v in fields]
+
+        total = sum(values)
+        idle = values[3]
+
+        if len(values) > 4:
+            idle += values[4]
+
+        return total, idle
+
+    try:
+        total1, idle1 = sample()
+        time.sleep(0.12)
+        total2, idle2 = sample()
+
+        dt = total2 - total1
+        di = idle2 - idle1
+
+        if dt <= 0:
+            return None
+
+        value = 100.0 * (dt - di) / dt
+        return max(0, min(100, round(value)))
+    except Exception:
+        return None
+
+
+def read_memory():
+    try:
+        mem = {}
+
+        for line in Path("/proc/meminfo").read_text().splitlines():
+            key, value = line.split(":", 1)
+            mem[key] = int(value.strip().split()[0])
+
+        total = mem["MemTotal"]
+        available = mem.get("MemAvailable", mem.get("MemFree", 0))
+        used = max(0, total - available)
+
+        percent = round((used / total) * 100) if total else None
+        gib = round(used / 1024 / 1024, 1)
+
+        return percent, gib
+    except Exception:
+        return None, None
+
+
+def read_gpu():
+    vendors = {
+        "0x8086": "Intel",
+        "0x1002": "AMD",
+        "0x10de": "NVIDIA",
+        "0x1af4": "VirtIO",
+    }
+
+    detected = []
+    busy_values = []
+    seen_devices = set()
+
+    try:
+        for card in sorted(Path("/sys/class/drm").glob("card[0-9]*")):
+            device = card / "device"
+
+            if not device.exists():
+                continue
+
+            real_device = os.path.realpath(device)
+
+            if real_device in seen_devices:
+                continue
+
+            seen_devices.add(real_device)
+
+            vendor_file = device / "vendor"
+
+            if vendor_file.exists():
+                vendor_id = vendor_file.read_text().strip().lower()
+                detected.append(vendors.get(vendor_id, "GPU"))
+
+            # Passive only. Never wake a discrete GPU just to draw the panel.
+            busy_file = device / "gpu_busy_percent"
+
+            if busy_file.is_file() and os.access(busy_file, os.R_OK):
+                try:
+                    busy = int(busy_file.read_text().strip())
+                    busy_values.append(max(0, min(100, busy)))
+                except Exception:
+                    pass
+
+    except Exception:
+        pass
+
+    unique = []
+
+    for vendor in detected:
+        if vendor not in unique:
+            unique.append(vendor)
+
+    if len(unique) > 1:
+        label = "Hybrid"
+    elif len(unique) == 1:
+        label = unique[0]
+    else:
+        label = "GPU"
+
+    if busy_values:
+        busy = round(sum(busy_values) / len(busy_values))
+
+        if label == "GPU":
+            label = f"{busy}%"
+        elif label != "Hybrid":
+            label = f"{label} {busy}%"
+
+    return label
+
+
+def read_power_profiles():
+    mapping = {
+        "power-saver": "Saver",
+        "balanced": "Balanced",
+        "performance": "Performance",
+    }
+
+    supported = []
+    active = "Unknown"
+
+    try:
+        result = subprocess.run(
+            ["powerprofilesctl", "list"],
+            capture_output=True,
+            text=True,
+            timeout=0.5,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            return active, supported
+
+        for raw_line in result.stdout.splitlines():
+            line = raw_line.strip()
+            selected = line.startswith("*")
+
+            if selected:
+                line = line[1:].strip()
+
+            if not line.endswith(":"):
+                continue
+
+            profile = line[:-1]
+
+            if profile not in mapping:
+                continue
+
+            supported.append(profile)
+
+            if selected:
+                active = mapping[profile]
+
+        return active, supported
+
+    except Exception:
+        return active, supported
+
+
+cpu = read_cpu()
+ram_percent, ram_used_gib = read_memory()
+power, power_profiles = read_power_profiles()
+
+print(
+    json.dumps(
+        {
+            "cpu_percent": cpu,
+            "ram_percent": ram_percent,
+            "ram_used_gib": ram_used_gib,
+            "gpu": read_gpu(),
+            "power": power,
+            "power_profiles": power_profiles,
+        },
+        separators=(",", ":"),
+    )
+)

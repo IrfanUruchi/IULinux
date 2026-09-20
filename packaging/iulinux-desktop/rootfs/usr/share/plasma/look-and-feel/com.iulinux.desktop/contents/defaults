@@ -1,0 +1,14 @@
+[kdeglobals][General]
+ColorScheme=IULinuxDark
+
+[kdeglobals][Icons]
+Theme=breeze-dark
+
+[kwinrc][org.kde.kdecoration2]
+library=org.kde.breeze
+
+[plasmarc][Theme]
+name=breeze-dark
+
+[Wallpaper]
+Image=IULinux
