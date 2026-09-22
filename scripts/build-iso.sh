@@ -47,6 +47,7 @@ for command in mksquashfs grub-mkrescue xorriso; do
 done
 
 "${PROJECT_ROOT}/tests/test-rootfs-identity.sh"
+"${PROJECT_ROOT}/tests/test-package-consistency.sh"
 "${PROJECT_ROOT}/tests/test-base-system.sh"
 "${PROJECT_ROOT}/tests/test-desktop.sh"
 "${PROJECT_ROOT}/tests/test-developer.sh"
