@@ -6,6 +6,7 @@ trap 'echo "[IULinux] ERROR: bootstrap failed at line ${LINENO}" >&2' ERR
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_FILE="${PROJECT_ROOT}/config/build.conf"
 ROOTFS_DIR="${PROJECT_ROOT}/build/rootfs"
+BOOTSTRAP_WORK="${PROJECT_ROOT}/build/bootstrap-work"
 
 if [[ ! -f "${CONFIG_FILE}" ]]; then
     echo "[IULinux] Missing configuration: ${CONFIG_FILE}" >&2
@@ -73,13 +74,22 @@ sudo mkdir -p "${ROOTFS_DIR}"
 echo
 echo "[IULinux] Bootstrapping Ubuntu ${UBUNTU_SUITE}..."
 
-sudo debootstrap \
-    --arch="${TARGET_ARCH}" \
-    --variant=minbase \
-    --components=main \
-    "${UBUNTU_SUITE}" \
-    "${ROOTFS_DIR}" \
-    "${UBUNTU_MIRROR}"
+sudo rm -rf "${BOOTSTRAP_WORK}"
+mkdir -p "${BOOTSTRAP_WORK}"
+
+(
+    trap 'sudo rm -rf -- "${BOOTSTRAP_WORK}"' EXIT
+
+    cd "${BOOTSTRAP_WORK}"
+
+    sudo debootstrap \
+        --arch="${TARGET_ARCH}" \
+        --variant=minbase \
+        --components=main \
+        "${UBUNTU_SUITE}" \
+        "${ROOTFS_DIR}" \
+        "${UBUNTU_MIRROR}"
+)
 
 echo
 echo "[IULinux] Configuring Ubuntu repositories..."
