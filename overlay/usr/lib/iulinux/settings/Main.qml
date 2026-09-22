@@ -440,21 +440,82 @@ Kirigami.ApplicationWindow {
                                     level: 3
                                 }
 
-                                Controls.Label {
-                                    text:
-                                        "Current hardware state: "
-                                        + systemBackend.gpuText
-
+                                GridLayout {
                                     Layout.fillWidth: true
-                                }
+                                    columns: 2
 
-                                Controls.Label {
-                                    text:
-                                        "Integrated, Hybrid and Discrete controls will appear here only when the IULinux hardware backend reports a verified safe switching path."
+                                    rowSpacing:
+                                        Kirigami.Units.smallSpacing
 
-                                    wrapMode: Text.WordWrap
-                                    Layout.fillWidth: true
-                                    opacity: 0.7
+                                    columnSpacing:
+                                        Kirigami.Units.gridUnit * 2
+
+                                    Controls.Label {
+                                        text: "Current mode"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        text: systemBackend.graphicsMode
+                                    }
+
+                                    Controls.Label {
+                                        text: "Detected GPUs"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        Layout.fillWidth: true
+                                        text: systemBackend.graphicsDevices
+                                        wrapMode: Text.WordWrap
+                                    }
+
+                                    Controls.Label {
+                                        text: "Detection backend"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        text: systemBackend.graphicsProvider
+                                    }
+
+                                    Controls.Label {
+                                        text: "Render offload"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        text:
+                                            systemBackend.graphicsOffloadAvailable
+                                            ? "Available"
+                                            : "Unavailable"
+                                    }
+
+                                    Controls.Label {
+                                        text: "Mode switching"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        Layout.fillWidth: true
+                                        text:
+                                            systemBackend.graphicsSwitchProvider.length > 0
+                                            ? systemBackend.graphicsSwitchProvider
+                                            : "No verified provider"
+                                        wrapMode: Text.WordWrap
+                                    }
+
+                                    Controls.Label {
+                                        text: "Reboot required"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        text:
+                                            systemBackend.graphicsRebootRequired
+                                            ? "Yes"
+                                            : "No"
+                                    }
                                 }
 
                                 RowLayout {
@@ -463,20 +524,71 @@ Kirigami.ApplicationWindow {
                                     Controls.Button {
                                         Layout.fillWidth: true
                                         text: "Integrated"
-                                        enabled: false
+                                        checkable: true
+
+                                        checked:
+                                            systemBackend.graphicsMode
+                                            === "Integrated"
+
+                                        enabled:
+                                            systemBackend.supportsIntegratedGraphics
+
+                                        onClicked:
+                                            systemBackend.setGraphicsMode(
+                                                "Integrated"
+                                            )
                                     }
 
                                     Controls.Button {
                                         Layout.fillWidth: true
                                         text: "Hybrid"
-                                        enabled: false
+                                        checkable: true
+
+                                        checked:
+                                            systemBackend.graphicsMode
+                                            === "Hybrid"
+
+                                        enabled:
+                                            systemBackend.supportsHybridGraphics
+
+                                        onClicked:
+                                            systemBackend.setGraphicsMode(
+                                                "Hybrid"
+                                            )
                                     }
 
                                     Controls.Button {
                                         Layout.fillWidth: true
                                         text: "Discrete"
-                                        enabled: false
+                                        checkable: true
+
+                                        checked:
+                                            systemBackend.graphicsMode
+                                            === "Discrete"
+
+                                        enabled:
+                                            systemBackend.supportsDiscreteGraphics
+
+                                        onClicked:
+                                            systemBackend.setGraphicsMode(
+                                                "Discrete"
+                                            )
                                     }
+                                }
+
+                                Controls.Label {
+                                    Layout.fillWidth: true
+
+                                    visible:
+                                        !systemBackend.supportsIntegratedGraphics
+                                        && !systemBackend.supportsHybridGraphics
+                                        && !systemBackend.supportsDiscreteGraphics
+
+                                    text:
+                                        "System-wide switching stays locked until IULinux detects a verified safe hardware provider."
+
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.7
                                 }
                             }
                         }

@@ -1,0 +1,299 @@
+#!/usr/bin/python3
+
+import json
+import os
+from pathlib import Path
+
+try:
+    import dbus
+except Exception:
+    dbus = None
+
+
+VENDORS = {
+    "0x8086": "Intel",
+    "0x1002": "AMD",
+    "0x10de": "NVIDIA",
+    "0x1af4": "VirtIO",
+}
+
+
+def plain(value):
+    if isinstance(value, dict):
+        return {str(k): plain(v) for k, v in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [plain(v) for v in value]
+
+    if isinstance(value, bool):
+        return value
+
+    try:
+        if dbus is not None and isinstance(
+            value,
+            (
+                dbus.Boolean,
+                dbus.Byte,
+                dbus.Int16,
+                dbus.UInt16,
+                dbus.Int32,
+                dbus.UInt32,
+                dbus.Int64,
+                dbus.UInt64,
+            ),
+        ):
+            return int(value)
+    except Exception:
+        pass
+
+    return str(value)
+
+
+def read_text(path):
+    try:
+        return Path(path).read_text().strip()
+    except Exception:
+        return ""
+
+
+def drm_devices():
+    devices = []
+    seen = set()
+
+    for card in sorted(Path("/sys/class/drm").glob("card*")):
+        if not card.name.startswith("card") or not card.name[4:].isdigit():
+            continue
+
+        dev = card / "device"
+
+        if not dev.exists():
+            continue
+
+        real = os.path.realpath(dev)
+
+        if real in seen:
+            continue
+
+        seen.add(real)
+
+        vendor_id = read_text(dev / "vendor").lower()
+        device_id = read_text(dev / "device").lower()
+
+        driver = ""
+        driver_link = dev / "driver"
+
+        if driver_link.exists():
+            try:
+                driver = Path(os.path.realpath(driver_link)).name
+            except Exception:
+                pass
+
+        pci_address = Path(real).name
+        boot_vga = read_text(dev / "boot_vga") == "1"
+
+        devices.append(
+            {
+                "card": card.name,
+                "pci_address": pci_address,
+                "vendor": VENDORS.get(vendor_id, "Unknown"),
+                "vendor_id": vendor_id,
+                "device_id": device_id,
+                "driver": driver,
+                "boot_vga": boot_vga,
+            }
+        )
+
+    return devices
+
+
+def switcheroo_state():
+    result = {
+        "available": False,
+        "dual_gpu": False,
+        "gpus": [],
+    }
+
+    if dbus is None:
+        return result
+
+    try:
+        bus = dbus.SystemBus()
+
+        obj = bus.get_object(
+            "net.hadess.SwitcherooControl",
+            "/net/hadess/SwitcherooControl",
+        )
+
+        props = dbus.Interface(
+            obj,
+            "org.freedesktop.DBus.Properties",
+        )
+
+        interface = "net.hadess.SwitcherooControl"
+
+        result["available"] = True
+        result["dual_gpu"] = bool(
+            props.Get(interface, "HasDualGpu")
+        )
+
+        raw_gpus = props.Get(interface, "GPUs")
+
+        for index, raw in enumerate(raw_gpus):
+            gpu = plain(raw)
+
+            result["gpus"].append(
+                {
+                    "index": index,
+                    "name": str(gpu.get("Name", "GPU")),
+                    "default": bool(gpu.get("Default", False)),
+                    "environment": gpu.get("Environment", []),
+                }
+            )
+
+    except Exception:
+        pass
+
+    return result
+
+
+
+def asus_armoury_state():
+    root = Path(
+        "/sys/class/firmware-attributes/asus-armoury/attributes"
+    )
+
+    result = {
+        "available": False,
+        "current_mode": None,
+        "supported_modes": [],
+        "pending_reboot": False,
+    }
+
+    dgpu = root / "dgpu_disable"
+    mux = root / "gpu_mux_mode"
+
+    if not dgpu.is_dir() or not mux.is_dir():
+        return result
+
+    dgpu_current = read_text(dgpu / "current_value")
+    mux_current = read_text(mux / "current_value")
+
+    dgpu_possible = {
+        value.strip()
+        for value in read_text(
+            dgpu / "possible_values"
+        ).split(";")
+        if value.strip()
+    }
+
+    mux_possible = {
+        value.strip()
+        for value in read_text(
+            mux / "possible_values"
+        ).split(";")
+        if value.strip()
+    }
+
+    # Fail closed unless this machine exposes the exact
+    # ASUS Armoury interface we have validated.
+    if dgpu_possible != {"0", "1"}:
+        return result
+
+    if mux_possible != {"0", "1"}:
+        return result
+
+    result["available"] = True
+    result["supported_modes"] = [
+        "Integrated",
+        "Hybrid",
+        "Discrete",
+    ]
+
+    if dgpu_current == "1":
+        result["current_mode"] = "Integrated"
+
+    elif dgpu_current == "0" and mux_current == "1":
+        result["current_mode"] = "Hybrid"
+
+    elif dgpu_current == "0" and mux_current == "0":
+        result["current_mode"] = "Discrete"
+
+    pending = root / "pending_reboot"
+
+    if pending.is_file():
+        result["pending_reboot"] = (
+            read_text(pending) == "1"
+        )
+
+    return result
+
+drm = drm_devices()
+switcheroo = switcheroo_state()
+asus = asus_armoury_state()
+
+offload_available = False
+
+for gpu in switcheroo["gpus"]:
+    if not gpu["default"] and gpu["environment"]:
+        offload_available = True
+        break
+
+
+# Do not claim Integrated or Discrete-only capability from GPU count alone.
+# Those modes require a verified machine-specific switching provider.
+if asus["available"] and asus["current_mode"]:
+    current_mode = asus["current_mode"]
+elif switcheroo["dual_gpu"]:
+    current_mode = "Hybrid"
+elif len(drm) == 1:
+    current_mode = "Single GPU"
+else:
+    current_mode = "Unknown"
+
+
+if asus["available"]:
+    supported_modes = asus["supported_modes"]
+elif switcheroo["dual_gpu"]:
+    supported_modes = ["Hybrid"]
+else:
+    supported_modes = []
+
+
+print(
+    json.dumps(
+        {
+            "api_version": 1,
+            "provider": (
+                "asus-armoury"
+                if asus["available"]
+                else (
+                    "switcheroo-control"
+                    if switcheroo["available"]
+                    else "drm"
+                )
+            ),
+            "current_mode": current_mode,
+            "supported_modes": supported_modes,
+            "offload_available": offload_available,
+            "switcheroo": switcheroo,
+            "drm_devices": drm,
+            "mode_switching": {
+                "integrated": bool(asus["available"]),
+                "hybrid": bool(asus["available"]),
+                "discrete": bool(asus["available"]),
+                "provider": (
+                    "asus-armoury"
+                    if asus["available"]
+                    else None
+                ),
+                "reboot_required": (
+                    asus["pending_reboot"]
+                    if asus["available"]
+                    else False
+                ),
+            },
+            "asus_armoury": asus,
+        },
+        separators=(",", ":"),
+    )
+)

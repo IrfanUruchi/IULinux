@@ -22,6 +22,7 @@ class SystemBackend(QObject):
     telemetryChanged = Signal()
     actionErrorChanged = Signal()
     powerProfilesChanged = Signal()
+    graphicsChanged = Signal()
 
     def __init__(self):
         super().__init__()
@@ -34,12 +35,28 @@ class SystemBackend(QObject):
         self._action_error = ""
         self._supported_power_profiles = set()
 
+        self._graphics_mode = "Unknown"
+        self._graphics_provider = "Unknown"
+        self._graphics_devices = "No GPUs detected"
+        self._graphics_offload = False
+        self._graphics_switch_provider = ""
+        self._graphics_reboot_required = False
+        self._supports_integrated_graphics = False
+        self._supports_hybrid_graphics = False
+        self._supports_discrete_graphics = False
+
         self.refreshPowerProfiles()
+        self.refreshGraphics()
 
         self._timer = QTimer(self)
         self._timer.setInterval(1500)
         self._timer.timeout.connect(self.refresh)
         self._timer.start()
+
+        self._graphics_timer = QTimer(self)
+        self._graphics_timer.setInterval(5000)
+        self._graphics_timer.timeout.connect(self.refreshGraphics)
+        self._graphics_timer.start()
 
         self.refresh()
 
@@ -109,6 +126,42 @@ class SystemBackend(QObject):
     @Property(bool, notify=powerProfilesChanged)
     def supportsPerformance(self):
         return "performance" in self._supported_power_profiles
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsMode(self):
+        return self._graphics_mode
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsProvider(self):
+        return self._graphics_provider
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsDevices(self):
+        return self._graphics_devices
+
+    @Property(bool, notify=graphicsChanged)
+    def graphicsOffloadAvailable(self):
+        return self._graphics_offload
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsSwitchProvider(self):
+        return self._graphics_switch_provider
+
+    @Property(bool, notify=graphicsChanged)
+    def graphicsRebootRequired(self):
+        return self._graphics_reboot_required
+
+    @Property(bool, notify=graphicsChanged)
+    def supportsIntegratedGraphics(self):
+        return self._supports_integrated_graphics
+
+    @Property(bool, notify=graphicsChanged)
+    def supportsHybridGraphics(self):
+        return self._supports_hybrid_graphics
+
+    @Property(bool, notify=graphicsChanged)
+    def supportsDiscreteGraphics(self):
+        return self._supports_discrete_graphics
 
     @Slot()
     def refreshPowerProfiles(self):
@@ -182,6 +235,139 @@ class SystemBackend(QObject):
 
         except Exception:
             pass
+
+    @Slot()
+    def refreshGraphics(self):
+        try:
+            result = subprocess.run(
+                ["/usr/lib/iulinux/iulinux-graphics-status"],
+                capture_output=True,
+                text=True,
+                timeout=2.0,
+                check=False,
+            )
+
+            if result.returncode != 0:
+                return
+
+            data = json.loads(result.stdout)
+
+            switcheroo = data.get("switcheroo", {})
+            switcheroo_gpus = switcheroo.get("gpus", [])
+
+            device_names = []
+
+            for gpu in switcheroo_gpus:
+                name = str(gpu.get("name", "")).strip()
+
+                if name and name not in device_names:
+                    device_names.append(name)
+
+            if not device_names:
+                for gpu in data.get("drm_devices", []):
+                    vendor = str(gpu.get("vendor", "GPU"))
+                    driver = str(gpu.get("driver", "")).strip()
+
+                    label = vendor
+
+                    if driver:
+                        label += " (" + driver + ")"
+
+                    if label not in device_names:
+                        device_names.append(label)
+
+            switching = data.get("mode_switching", {})
+
+            new_values = (
+                str(data.get("current_mode", "Unknown")),
+                str(data.get("provider", "Unknown")),
+                "\n".join(device_names) or "No GPUs detected",
+                bool(data.get("offload_available", False)),
+                str(switching.get("provider") or ""),
+                bool(switching.get("reboot_required", False)),
+                bool(switching.get("integrated", False)),
+                bool(switching.get("hybrid", False)),
+                bool(switching.get("discrete", False)),
+            )
+
+            old_values = (
+                self._graphics_mode,
+                self._graphics_provider,
+                self._graphics_devices,
+                self._graphics_offload,
+                self._graphics_switch_provider,
+                self._graphics_reboot_required,
+                self._supports_integrated_graphics,
+                self._supports_hybrid_graphics,
+                self._supports_discrete_graphics,
+            )
+
+            if new_values == old_values:
+                return
+
+            (
+                self._graphics_mode,
+                self._graphics_provider,
+                self._graphics_devices,
+                self._graphics_offload,
+                self._graphics_switch_provider,
+                self._graphics_reboot_required,
+                self._supports_integrated_graphics,
+                self._supports_hybrid_graphics,
+                self._supports_discrete_graphics,
+            ) = new_values
+
+            self.graphicsChanged.emit()
+
+        except Exception:
+            pass
+
+    @Slot(str)
+    def setGraphicsMode(self, mode):
+        allowed = {
+            "Integrated": self._supports_integrated_graphics,
+            "Hybrid": self._supports_hybrid_graphics,
+            "Discrete": self._supports_discrete_graphics,
+        }
+
+        if mode not in allowed:
+            self._set_error("Unsupported graphics mode")
+            return
+
+        if not allowed[mode]:
+            self._set_error(
+                mode + " graphics mode is not available on this system"
+            )
+            return
+
+        try:
+            result = subprocess.run(
+                [
+                    "/usr/bin/pkexec",
+                    "/usr/lib/iulinux/iulinux-graphics-switch",
+                    mode,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120.0,
+                check=False,
+            )
+
+            if result.returncode != 0:
+                message = result.stderr.strip() or result.stdout.strip()
+                self._set_error(
+                    message or "Unable to change graphics mode"
+                )
+                return
+
+            self._set_error("")
+            self.refreshGraphics()
+
+        except subprocess.TimeoutExpired:
+            self._set_error("Graphics mode authentication timed out")
+
+        except Exception as exc:
+            self._set_error(str(exc))
 
     @Slot(str)
     def setPowerMode(self, mode):

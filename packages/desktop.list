@@ -65,3 +65,8 @@ python3-pyside6.qtquick
 python3-pyside6.qtquickcontrols2
 python3-dbus
 python3-gi
+
+# IULinux desktop runtime
+switcheroo-control
+pkexec
+xdg-terminal-exec

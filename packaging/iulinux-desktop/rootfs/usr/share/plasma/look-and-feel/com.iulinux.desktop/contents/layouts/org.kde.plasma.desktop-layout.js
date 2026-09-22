@@ -46,7 +46,7 @@ const panel = new Panel;
 panel.location = "bottom";
 panel.height = panelHeight;
 panel.alignment = "center";
-panel.lengthMode = "fit";
+panel.lengthMode = "fill";
 panel.hiding = "autohide";
 
 const panelView = new ConfigFile(
@@ -91,6 +91,25 @@ function addGap() {
     return gap;
 }
 
+
+function addExpandingEdgeSpacer() {
+    const spacer = panel.addWidget(
+        "org.kde.plasma.panelspacer"
+    );
+
+    spacer.currentConfigGroup = [
+        "General"
+    ];
+
+    spacer.writeConfig(
+        "expanding",
+        true
+    );
+
+    return spacer;
+}
+
+addExpandingEdgeSpacer();
 
 // Performance
 panel.addWidget(
@@ -210,3 +229,5 @@ colorizer.writeConfig(
         normal: "/usr/share/plasma/plasmoids/luisbocanegra.panel.colorizer/contents/ui/presets/IULinux Dock"
     })
 );
+
+addExpandingEdgeSpacer();

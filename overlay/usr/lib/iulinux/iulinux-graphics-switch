@@ -1,0 +1,159 @@
+#!/usr/bin/python3
+
+import os
+import sys
+from pathlib import Path
+
+
+ASUS_ROOT = Path(
+    "/sys/class/firmware-attributes/asus-armoury/attributes"
+)
+
+
+def fail(message, code=1):
+    print(message, file=sys.stderr)
+    raise SystemExit(code)
+
+
+def read(path):
+    try:
+        return path.read_text().strip()
+    except Exception as exc:
+        fail(f"Unable to read {path}: {exc}")
+
+
+def validate_enum(attribute):
+    path = ASUS_ROOT / attribute
+
+    if not path.is_dir():
+        fail(f"Unsupported hardware: missing {attribute}")
+
+    possible = {
+        value.strip()
+        for value in read(path / "possible_values").split(";")
+        if value.strip()
+    }
+
+    if possible != {"0", "1"}:
+        fail(
+            f"Unsupported {attribute} values: "
+            + ",".join(sorted(possible))
+        )
+
+    return path
+
+
+def write_verified(attribute, value):
+    path = validate_enum(attribute)
+    current = path / "current_value"
+
+    if value not in {"0", "1"}:
+        fail("Internal error: invalid firmware value")
+
+    try:
+        current.write_text(value)
+    except Exception as exc:
+        fail(f"Unable to change {attribute}: {exc}")
+
+    actual = read(current)
+
+    if actual != value:
+        fail(
+            f"{attribute} verification failed: "
+            f"requested {value}, read back {actual}"
+        )
+
+
+def state():
+    dgpu = read(
+        validate_enum("dgpu_disable") / "current_value"
+    )
+
+    mux = read(
+        validate_enum("gpu_mux_mode") / "current_value"
+    )
+
+    if dgpu == "1":
+        return "Integrated", dgpu, mux
+
+    if dgpu == "0" and mux == "1":
+        return "Hybrid", dgpu, mux
+
+    if dgpu == "0" and mux == "0":
+        return "Discrete", dgpu, mux
+
+    fail("Firmware reports an unsupported graphics state")
+
+
+def switch(target):
+    current, dgpu, mux = state()
+
+    if target == current:
+        print(f"Already in {target} mode")
+        return
+
+    if target == "Hybrid":
+        # Hybrid requires the dGPU enabled and the display MUX
+        # routed through the integrated/hybrid path.
+        if mux == "0":
+            write_verified("gpu_mux_mode", "1")
+            print(
+                "Hybrid mode selected. Reboot required "
+                "for the MUX change."
+            )
+            return
+
+        write_verified("dgpu_disable", "0")
+        print("Hybrid mode enabled")
+        return
+
+    if target == "Integrated":
+        # Never disable the dGPU while firmware says that
+        # the display MUX is routed to it.
+        if mux == "0":
+            fail(
+                "Cannot switch directly from Discrete to "
+                "Integrated. Switch to Hybrid, reboot, then "
+                "select Integrated."
+            )
+
+        write_verified("dgpu_disable", "1")
+        print("Integrated mode enabled")
+        return
+
+    if target == "Discrete":
+        # The ASUS driver requires the dGPU to be enabled
+        # before switching the display MUX to it.
+        if dgpu == "1":
+            write_verified("dgpu_disable", "0")
+
+        write_verified("gpu_mux_mode", "0")
+
+        print(
+            "Discrete mode selected. Reboot required "
+            "for the MUX change."
+        )
+        return
+
+    fail("Unsupported graphics mode")
+
+
+def main():
+    if os.geteuid() != 0:
+        fail(
+            "This helper must be invoked through Polkit/pkexec",
+            77,
+        )
+
+    if len(sys.argv) != 2:
+        fail(
+            "Usage: iulinux-graphics-switch "
+            "{Integrated|Hybrid|Discrete}",
+            64,
+        )
+
+    switch(sys.argv[1])
+
+
+if __name__ == "__main__":
+    main()
