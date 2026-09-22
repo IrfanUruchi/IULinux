@@ -8,6 +8,13 @@ source "${PROJECT_ROOT}/config/build.conf"
 
 ISO="${1:-${PROJECT_ROOT}/build/IULinux-${IULINUX_VERSION}-${TARGET_ARCH}.iso}"
 
+# The first positional argument is the ISO. Any remaining arguments
+# are passed directly to QEMU, allowing test disks and other devices
+# to be attached without hard-coding them into this helper.
+if (( $# > 0 )); then
+    shift
+fi
+
 [[ -f "${ISO}" ]] || {
     echo "[IULinux] ISO not found: ${ISO}" >&2
     exit 1
@@ -37,4 +44,4 @@ else
     )
 fi
 
-exec qemu-system-x86_64 "${QEMU_ARGS[@]}"
+exec qemu-system-x86_64 "${QEMU_ARGS[@]}" "$@"
