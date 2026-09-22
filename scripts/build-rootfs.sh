@@ -6,10 +6,36 @@ ROOTFS_DIR="${PROJECT_ROOT}/build/rootfs"
 
 MODE="${1:-}"
 
+case "${MODE}" in
+    --plan|--clean)
+        CORE_STAGE="install-iulinux-core.sh"
+        CORE_SOURCE="published signed archive"
+        ;;
+    --plan-local|--clean-local)
+        CORE_STAGE="sync-local-packages.sh"
+        CORE_SOURCE="local package sources"
+        ;;
+    *)
+        cat <<USAGE
+Usage:
+  $0 --plan
+  $0 --plan-local
+  $0 --clean
+  $0 --clean-local
+
+--plan         Show the published-package rootfs pipeline.
+--plan-local   Show the local-development rootfs pipeline.
+--clean        Rebuild using the signed published IULinux archive.
+--clean-local  Rebuild using the current local IULinux package sources.
+USAGE
+        exit 2
+        ;;
+esac
+
 STAGES=(
     bootstrap-rootfs.sh
     install-base-system.sh
-    install-iulinux-core.sh
+    "${CORE_STAGE}"
     install-desktop.sh
     install-developer.sh
     install-containers.sh
@@ -26,27 +52,18 @@ show_plan()
     echo "============================================"
     echo " IULinux rootfs build pipeline"
     echo "============================================"
+    echo "Core source: ${CORE_SOURCE}"
+    echo
 
     for stage in "${STAGES[@]}"; do
         echo " -> ${stage}"
     done
 }
 
-if [[ "${MODE}" == "--plan" ]]; then
+if [[ "${MODE}" == "--plan" ||
+      "${MODE}" == "--plan-local" ]]; then
     show_plan
     exit 0
-fi
-
-if [[ "${MODE}" != "--clean" ]]; then
-    cat <<USAGE
-Usage:
-  $0 --plan
-  $0 --clean
-
---plan   Show the complete rootfs build pipeline.
---clean  Delete build/rootfs and reproduce it from scratch.
-USAGE
-    exit 2
 fi
 
 # Safety: never remove anything except the canonical rootfs.
@@ -87,18 +104,9 @@ run_stage()
     "${PROJECT_ROOT}/scripts/${stage}"
 }
 
-run_stage bootstrap-rootfs.sh
-run_stage install-base-system.sh
-run_stage install-iulinux-core.sh
-run_stage install-desktop.sh
-run_stage install-developer.sh
-run_stage install-containers.sh
-run_stage install-gpu-base.sh
-run_stage install-brave.sh
-run_stage install-onlyoffice.sh
-run_stage install-live-system.sh
-run_stage install-installer.sh
-run_stage apply-overlay.sh
+for stage in "${STAGES[@]}"; do
+    run_stage "${stage}"
+done
 
 echo
 echo "============================================"
