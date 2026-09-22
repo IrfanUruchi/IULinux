@@ -18,6 +18,7 @@ PlasmoidItem {
     property int ramPercent: -1
     property real ramUsedGiB: -1
     property string gpuText: "--"
+    property string graphicsModeText: "Unknown"
     property string powerText: "Unknown"
     property bool supportsSaver: false
     property bool supportsBalanced: false
@@ -74,6 +75,13 @@ PlasmoidItem {
         }
 }
 
+    function applyGraphics(obj) {
+        if (obj.current_mode)
+            graphicsModeText = obj.current_mode
+        else
+            graphicsModeText = "Unknown"
+    }
+
     function requestPowerProfile(profile) {
         powerControl.command =
             "powerprofilesctl set " + profile
@@ -122,6 +130,44 @@ PlasmoidItem {
     }
 
     Plasma5Support.DataSource {
+        id: graphicsTelemetry
+
+        engine: "executable"
+        connectedSources: []
+
+        property bool busy: false
+        readonly property string command:
+            "/usr/lib/iulinux/iulinux-graphics-status"
+
+        function refresh() {
+            if (busy)
+                return
+
+            busy = true
+            connectSource(command)
+        }
+
+        onNewData: function(sourceName, data) {
+            disconnectSource(sourceName)
+            busy = false
+
+            if (data["exit code"] !== 0)
+                return
+
+            try {
+                root.applyGraphics(
+                    JSON.parse(data["stdout"].trim())
+                )
+            } catch (error) {
+                console.warn(
+                    "IULinux graphics telemetry parse failed:",
+                    error
+                )
+            }
+        }
+    }
+
+    Plasma5Support.DataSource {
         id: powerControl
 
         engine: "executable"
@@ -145,7 +191,18 @@ PlasmoidItem {
         onTriggered: telemetry.refresh()
     }
 
-    Component.onCompleted: telemetry.refresh()
+    Timer {
+        interval: 5000
+        repeat: true
+        running: true
+
+        onTriggered: graphicsTelemetry.refresh()
+    }
+
+    Component.onCompleted: {
+        telemetry.refresh()
+        graphicsTelemetry.refresh()
+    }
 
     compactRepresentation: Item {
         implicitWidth: root.implicitWidth
@@ -373,7 +430,7 @@ PlasmoidItem {
 
                 text:
                     "Current mode: " +
-                    root.gpuText +
+                    root.graphicsModeText +
                     "\n\nAdvanced GPU switching and power limits " +
                     "will appear here only when the hardware backend " +
                     "reports that they are safely supported."
