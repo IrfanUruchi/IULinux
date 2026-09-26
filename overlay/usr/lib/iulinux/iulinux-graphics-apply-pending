@@ -15,6 +15,10 @@ PENDING_MODE = Path(
     "/var/lib/iulinux/graphics-pending-mode"
 )
 
+NVIDIA_AUTOLOAD_BLOCK = Path(
+    "/etc/iulinux/nvidia-autoload-blocked"
+)
+
 
 def fail(message):
     print(message, file=sys.stderr)
@@ -93,6 +97,43 @@ def pending_target():
 
 def clear_pending():
     PENDING_MODE.unlink(missing_ok=True)
+
+
+def set_nvidia_autoload_blocked(blocked):
+    if blocked:
+        NVIDIA_AUTOLOAD_BLOCK.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+            mode=0o755,
+        )
+
+        temporary = (
+            NVIDIA_AUTOLOAD_BLOCK.parent
+            / ".nvidia-autoload-blocked.tmp"
+        )
+
+        temporary.write_text("Integrated\n")
+        os.chmod(temporary, 0o644)
+        os.replace(
+            temporary,
+            NVIDIA_AUTOLOAD_BLOCK,
+        )
+
+    else:
+        NVIDIA_AUTOLOAD_BLOCK.unlink(
+            missing_ok=True
+        )
+
+
+def sync_nvidia_autoload_block():
+    dgpu = read(
+        validate_enum("dgpu_disable")
+        / "current_value"
+    )
+
+    set_nvidia_autoload_blocked(
+        dgpu == "1"
+    )
 
 
 def configured_state():
@@ -208,6 +249,10 @@ def wait_for_no_nvidia_clients(timeout=8.0):
 def apply(target):
     configured, dgpu, mux = configured_state()
 
+    # Keep module-autoload policy synchronized with the actual
+    # verified firmware state before doing anything else.
+    sync_nvidia_autoload_block()
+
     if target == configured and not firmware_pending_reboot():
         clear_pending()
         print(
@@ -222,7 +267,16 @@ def apply(target):
             )
 
         wait_for_no_nvidia_clients()
-        write_attribute("dgpu_disable", "1")
+
+        try:
+            write_attribute(
+                "dgpu_disable",
+                "1",
+            )
+        finally:
+            # Whether the write succeeds or fails, derive the guard
+            # from the firmware value we can actually read back.
+            sync_nvidia_autoload_block()
 
         clear_pending()
         print(
@@ -235,7 +289,13 @@ def apply(target):
         if configured == "Integrated":
             # Enabling the dGPU after the graphical stack has stopped
             # is safe; the next boot performs normal driver discovery.
-            write_attribute("dgpu_disable", "0")
+            try:
+                write_attribute(
+                    "dgpu_disable",
+                    "0",
+                )
+            finally:
+                sync_nvidia_autoload_block()
 
         elif configured == "Discrete":
             wait_for_no_nvidia_clients()
@@ -245,6 +305,8 @@ def apply(target):
                 "1",
                 allow_deferred=True,
             )
+
+            sync_nvidia_autoload_block()
 
         clear_pending()
         print(
@@ -267,6 +329,8 @@ def apply(target):
                 "0",
                 allow_deferred=True,
             )
+
+            sync_nvidia_autoload_block()
 
         clear_pending()
         print(

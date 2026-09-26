@@ -1,0 +1,35 @@
+#!/bin/sh
+set -e
+
+case "${1:-}" in
+    configure)
+        ROOT="/sys/class/firmware-attributes/asus-armoury/attributes"
+        CURRENT="$ROOT/dgpu_disable/current_value"
+        MARKER="/etc/iulinux/nvidia-autoload-blocked"
+
+        if [ -r "$CURRENT" ]; then
+            value="$(cat "$CURRENT" 2>/dev/null || true)"
+
+            case "$value" in
+                1)
+                    mkdir -p /etc/iulinux
+                    printf '%s\n' 'Integrated' > "$MARKER"
+                    chmod 0644 "$MARKER"
+                    ;;
+
+                0)
+                    rm -f "$MARKER"
+                    ;;
+
+                *)
+                    echo \
+                      "IULinux: refusing to infer NVIDIA autoload state from unexpected dgpu_disable value: $value" \
+                      >&2
+                    exit 1
+                    ;;
+            esac
+        fi
+        ;;
+esac
+
+exit 0
