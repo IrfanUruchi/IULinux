@@ -1,0 +1,16 @@
+[Unit]
+Description=IULinux safe graphics shutdown transition
+Before=display-manager.service
+Before=nvidia-persistenced.service
+Before=nvidia-powerd.service
+RefuseManualStop=yes
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/true
+ExecStop=/usr/lib/iulinux/iulinux-graphics-apply-pending
+RemainAfterExit=yes
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

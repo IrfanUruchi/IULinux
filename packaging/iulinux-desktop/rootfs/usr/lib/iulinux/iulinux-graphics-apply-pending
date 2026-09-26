@@ -25,185 +25,279 @@ def read(path):
     return Path(path).read_text().strip()
 
 
-def wait_for_asus(timeout=8.0):
-    deadline = time.monotonic() + timeout
+def validate_enum(attribute):
+    path = ASUS_ROOT / attribute
 
-    while time.monotonic() < deadline:
-        if (
-            (ASUS_ROOT / "dgpu_disable/current_value").is_file()
-            and
-            (ASUS_ROOT / "gpu_mux_mode/current_value").is_file()
-        ):
+    if not path.is_dir():
+        fail(f"Unsupported hardware: missing {attribute}")
+
+    possible = {
+        value.strip()
+        for value in read(path / "possible_values").split(";")
+        if value.strip()
+    }
+
+    if possible != {"0", "1"}:
+        fail(
+            f"Unsupported {attribute} values: "
+            + ",".join(sorted(possible))
+        )
+
+    return path
+
+
+def firmware_pending_reboot():
+    path = ASUS_ROOT / "pending_reboot"
+
+    if not path.is_file():
+        return False
+
+    try:
+        return read(path) == "1"
+    except Exception:
+        return False
+
+
+def system_is_stopping():
+    try:
+        result = subprocess.run(
+            [
+                "/usr/bin/systemctl",
+                "is-system-running",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+    except Exception:
+        return False
+
+    return result.stdout.strip() == "stopping"
+
+
+def pending_target():
+    if not PENDING_MODE.is_file():
+        return None
+
+    try:
+        value = read(PENDING_MODE)
+    except Exception:
+        return None
+
+    if value in {"Integrated", "Hybrid", "Discrete"}:
+        return value
+
+    fail("Invalid pending graphics mode")
+
+
+def clear_pending():
+    PENDING_MODE.unlink(missing_ok=True)
+
+
+def configured_state():
+    dgpu = read(
+        validate_enum("dgpu_disable") / "current_value"
+    )
+
+    mux = read(
+        validate_enum("gpu_mux_mode") / "current_value"
+    )
+
+    if dgpu == "1":
+        return "Integrated", dgpu, mux
+
+    if dgpu == "0" and mux == "1":
+        return "Hybrid", dgpu, mux
+
+    if dgpu == "0" and mux == "0":
+        return "Discrete", dgpu, mux
+
+    fail("Firmware reports an unsupported graphics state")
+
+
+def write_attribute(attribute, value, allow_deferred=False):
+    path = validate_enum(attribute)
+    current = path / "current_value"
+
+    try:
+        current.write_text(value)
+    except Exception as exc:
+        fail(f"Unable to change {attribute}: {exc}")
+
+    actual = read(current)
+
+    if actual == value:
+        return
+
+    if allow_deferred and firmware_pending_reboot():
+        return
+
+    fail(
+        f"{attribute} verification failed: "
+        f"requested {value}, read back {actual}"
+    )
+
+
+def process_uses_nvidia(proc):
+    try:
+        for fd in (proc / "fd").iterdir():
+            try:
+                target = os.readlink(fd)
+
+                if target.startswith("/dev/nvidia"):
+                    return True
+
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    try:
+        maps = (proc / "maps").read_text(
+            errors="replace"
+        )
+
+        if "/dev/nvidia" in maps:
             return True
 
-        time.sleep(0.1)
+    except Exception:
+        pass
 
     return False
 
 
-def write(attribute, value):
-    path = ASUS_ROOT / attribute / "current_value"
-    path.write_text(value)
+def nvidia_clients():
+    clients = []
 
-    actual = read(path)
+    for proc in Path("/proc").glob("[0-9]*"):
+        if not process_uses_nvidia(proc):
+            continue
 
-    if actual != value:
+        try:
+            name = read(proc / "comm")
+        except Exception:
+            name = "unknown"
+
+        clients.append(f"{proc.name}:{name}")
+
+    return clients
+
+
+def wait_for_no_nvidia_clients(timeout=8.0):
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        clients = nvidia_clients()
+
+        if not clients:
+            return
+
+        time.sleep(0.2)
+
+    clients = nvidia_clients()
+
+    if clients:
         fail(
-            f"{attribute} boot-time verification failed: "
-            f"requested {value}, read back {actual}"
+            "Refusing graphics firmware transition while "
+            "NVIDIA is still in use by: "
+            + ", ".join(clients[:12])
         )
 
 
-def nvidia_devices():
-    result = []
+def apply(target):
+    configured, dgpu, mux = configured_state()
 
-    for device in Path("/sys/bus/pci/devices").glob("*"):
-        try:
-            vendor = read(device / "vendor").lower()
-        except Exception:
-            continue
+    if target == configured and not firmware_pending_reboot():
+        clear_pending()
+        print(
+            f"{target} graphics mode was already configured"
+        )
+        return
 
-        if vendor == "0x10de":
-            result.append(device)
+    if target == "Integrated":
+        if configured == "Discrete" or mux == "0":
+            fail(
+                "Integrated requires Hybrid mode first"
+            )
 
-    return result
+        wait_for_no_nvidia_clients()
+        write_attribute("dgpu_disable", "1")
 
+        clear_pending()
+        print(
+            "Applied pending Integrated graphics mode "
+            "during shutdown"
+        )
+        return
 
-def nvidia_bound():
-    for device in nvidia_devices():
-        driver = device / "driver"
+    if target == "Hybrid":
+        if configured == "Integrated":
+            # Enabling the dGPU after the graphical stack has stopped
+            # is safe; the next boot performs normal driver discovery.
+            write_attribute("dgpu_disable", "0")
 
-        if not driver.is_symlink():
-            continue
+        elif configured == "Discrete":
+            wait_for_no_nvidia_clients()
 
-        if Path(os.path.realpath(driver)).name == "nvidia":
-            return True
+            write_attribute(
+                "gpu_mux_mode",
+                "1",
+                allow_deferred=True,
+            )
 
-    return False
+        clear_pending()
+        print(
+            "Applied pending Hybrid graphics mode "
+            "during shutdown"
+        )
+        return
 
+    if target == "Discrete":
+        if configured == "Integrated":
+            fail(
+                "Discrete requires Hybrid mode first"
+            )
 
-def wait_nvidia(timeout=5.0):
-    deadline = time.monotonic() + timeout
+        if configured == "Hybrid":
+            wait_for_no_nvidia_clients()
 
-    while time.monotonic() < deadline:
-        if nvidia_bound():
-            return True
+            write_attribute(
+                "gpu_mux_mode",
+                "0",
+                allow_deferred=True,
+            )
 
-        time.sleep(0.1)
+        clear_pending()
+        print(
+            "Applied pending Discrete graphics mode "
+            "during shutdown"
+        )
+        return
 
-    return nvidia_bound()
-
-
-def reprobe_nvidia():
-    subprocess.run(
-        ["modprobe", "nvidia"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-
-    subprocess.run(
-        ["udevadm", "settle"],
-        check=False,
-        timeout=5,
-    )
-
-    if nvidia_bound():
-        return True
-
-    probe = Path("/sys/bus/pci/drivers_probe")
-
-    for device in nvidia_devices():
-        if (device / "driver").is_symlink():
-            continue
-
-        try:
-            probe.write_text(device.name)
-        except Exception:
-            continue
-
-    subprocess.run(
-        ["udevadm", "settle"],
-        check=False,
-        timeout=5,
-    )
-
-    return wait_nvidia()
+    fail("Unsupported pending graphics mode")
 
 
 def main():
     if os.geteuid() != 0:
-        fail("Boot-time graphics helper requires root")
+        fail("Graphics shutdown helper requires root")
 
-    if not PENDING_MODE.is_file():
+    target = pending_target()
+
+    if target is None:
         return
 
-    target = read(PENDING_MODE)
-
-    if target not in {"Integrated", "Hybrid", "Discrete"}:
-        fail("Invalid pending graphics mode")
-
-    if not wait_for_asus():
-        fail("ASUS Armoury graphics attributes did not appear")
-
-    dgpu = read(
-        ASUS_ROOT / "dgpu_disable/current_value"
-    )
-
-    mux = read(
-        ASUS_ROOT / "gpu_mux_mode/current_value"
-    )
-
-    if target == "Integrated":
-        if mux != "1":
-            fail(
-                "Integrated cannot be applied while the "
-                "display MUX is configured for Discrete"
-            )
-
-        if dgpu != "1":
-            write("dgpu_disable", "1")
-
-        PENDING_MODE.unlink(missing_ok=True)
-        print("Applied pending Integrated graphics mode")
+    # ExecStop can also run if somebody stops/restarts the unit
+    # manually. Never mutate graphics firmware unless systemd is
+    # actually shutting the machine down.
+    if not system_is_stopping():
+        print(
+            "Pending graphics transition retained; "
+            "system is not shutting down"
+        )
         return
 
-    if target == "Hybrid":
-        if mux != "1":
-            fail(
-                "Hybrid MUX transition is still pending firmware reboot"
-            )
-
-        if dgpu != "0":
-            write("dgpu_disable", "0")
-
-        if not reprobe_nvidia():
-            fail(
-                "Hybrid is configured but NVIDIA did not attach "
-                "before the graphical session"
-            )
-
-        PENDING_MODE.unlink(missing_ok=True)
-        print("Applied pending Hybrid graphics mode")
-        return
-
-    if target == "Discrete":
-        if mux != "0":
-            fail(
-                "Discrete MUX transition is still pending firmware reboot"
-            )
-
-        if dgpu != "0":
-            write("dgpu_disable", "0")
-
-        if not reprobe_nvidia():
-            fail(
-                "Discrete is configured but NVIDIA did not attach "
-                "before the graphical session"
-            )
-
-        PENDING_MODE.unlink(missing_ok=True)
-        print("Applied pending Discrete graphics mode")
+    apply(target)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
 import os
+import subprocess
 import sys
-import time
 from pathlib import Path
 
 
@@ -13,6 +13,8 @@ ASUS_ROOT = Path(
 PENDING_MODE = Path(
     "/var/lib/iulinux/graphics-pending-mode"
 )
+
+TRANSITION_SERVICE = "iulinux-graphics-transition.service"
 
 
 def fail(message, code=1):
@@ -60,30 +62,25 @@ def firmware_pending_reboot():
         return False
 
 
-def write_attribute(attribute, value, allow_deferred=False):
-    path = validate_enum(attribute)
-    current = path / "current_value"
-
-    if value not in {"0", "1"}:
-        fail("Internal error: invalid firmware value")
-
-    try:
-        current.write_text(value)
-    except Exception as exc:
-        fail(f"Unable to change {attribute}: {exc}")
-
-    actual = read(current)
-
-    if actual == value:
-        return True
-
-    if allow_deferred and firmware_pending_reboot():
-        return False
-
-    fail(
-        f"{attribute} verification failed: "
-        f"requested {value}, read back {actual}"
+def configured_state():
+    dgpu = read(
+        validate_enum("dgpu_disable") / "current_value"
     )
+
+    mux = read(
+        validate_enum("gpu_mux_mode") / "current_value"
+    )
+
+    if dgpu == "1":
+        return "Integrated", dgpu, mux
+
+    if dgpu == "0" and mux == "1":
+        return "Hybrid", dgpu, mux
+
+    if dgpu == "0" and mux == "0":
+        return "Discrete", dgpu, mux
+
+    fail("Firmware reports an unsupported graphics state")
 
 
 def set_pending(target):
@@ -116,182 +113,92 @@ def pending_target():
     return None
 
 
-def nvidia_bound():
-    pci_root = Path("/sys/bus/pci/devices")
-
+def ensure_transition_service():
     try:
-        devices = list(pci_root.iterdir())
-    except Exception:
-        return False
+        result = subprocess.run(
+            [
+                "/usr/bin/systemctl",
+                "start",
+                TRANSITION_SERVICE,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8.0,
+            check=False,
+        )
+    except Exception as exc:
+        fail(
+            "Unable to arm the graphics shutdown transition: "
+            + str(exc)
+        )
 
-    for device in devices:
-        try:
-            if (device / "vendor").read_text().strip().lower() != "0x10de":
-                continue
+    if result.returncode != 0:
+        message = result.stderr.strip() or result.stdout.strip()
 
-            driver = device / "driver"
-
-            if not driver.is_symlink():
-                continue
-
-            if Path(os.path.realpath(driver)).name == "nvidia":
-                return True
-
-        except Exception:
-            continue
-
-    return False
-
-
-def wait_nvidia_bound(timeout=2.0):
-    deadline = time.monotonic() + timeout
-
-    while time.monotonic() < deadline:
-        if nvidia_bound():
-            return True
-
-        time.sleep(0.1)
-
-    return nvidia_bound()
-
-
-def state():
-    dgpu = read(
-        validate_enum("dgpu_disable") / "current_value"
-    )
-
-    mux = read(
-        validate_enum("gpu_mux_mode") / "current_value"
-    )
-
-    if dgpu == "1":
-        return "Integrated", dgpu, mux
-
-    if dgpu == "0" and mux == "1":
-        return "Hybrid", dgpu, mux
-
-    if dgpu == "0" and mux == "0":
-        return "Discrete", dgpu, mux
-
-    fail("Firmware reports an unsupported graphics state")
+        fail(
+            message
+            or "Unable to arm the graphics shutdown transition"
+        )
 
 
 def switch(target):
-    configured, dgpu, mux = state()
+    configured, dgpu, mux = configured_state()
     pending = pending_target()
 
-    if target == configured:
-        if pending == target:
+    # Selecting the already configured mode cancels an uncommitted
+    # IULinux request. No firmware mutation occurs in the live session.
+    if target == configured and not firmware_pending_reboot():
+        if pending is not None:
+            clear_pending()
             print(
-                f"{target} mode is configured. "
-                "Restart required to complete the transition."
+                f"Pending graphics transition cancelled. "
+                f"Already configured for {target} mode."
             )
-            return
+        else:
+            print(f"Already in {target} mode")
 
-        if target == "Hybrid" and not nvidia_bound():
-            set_pending("Hybrid")
-            print(
-                "Hybrid mode is configured, but the NVIDIA GPU "
-                "is not attached to the running kernel. "
-                "Restart required."
-            )
-            return
-
-        clear_pending()
-        print(f"Already in {target} mode")
         return
 
-    if target == "Hybrid":
-        # Moving away from Discrete requires a MUX change, which is
-        # intentionally treated as a reboot transition.
-        if mux == "0":
-            set_pending("Hybrid")
-
-            write_attribute(
-                "gpu_mux_mode",
-                "1",
-                allow_deferred=True,
-            )
-
-            print(
-                "Hybrid mode selected. Restart required "
-                "to complete the display MUX transition."
-            )
-            return
-
-        # Integrated -> Hybrid can be attempted live. Do not force
-        # driver rebinding from a running graphical session; if normal
-        # hotplug does not restore NVIDIA, keep the request pending.
-        if dgpu == "1":
-            write_attribute("dgpu_disable", "0")
-
-            if wait_nvidia_bound():
-                clear_pending()
-                print("Hybrid mode enabled")
-                return
-
-            set_pending("Hybrid")
-
-            print(
-                "Hybrid mode configured. Restart required "
-                "to attach the NVIDIA GPU cleanly."
-            )
-            return
-
-        set_pending("Hybrid")
-        print(
-            "Hybrid mode configured. Restart required "
-            "to attach the NVIDIA GPU cleanly."
-        )
-        return
-
-    if target == "Integrated":
-        if mux == "0":
-            fail(
-                "Cannot switch directly from Discrete to "
-                "Integrated. Select Hybrid first and restart."
-            )
-
-        # Never remove an NVIDIA GPU from a running graphical session
-        # while the kernel driver is attached. We proved on real ASUS
-        # hardware that doing so can leave stale NVIDIA users and make
-        # the next bind block in uninterruptible kernel sleep.
-        if nvidia_bound():
-            set_pending("Integrated")
-
-            print(
-                "Integrated mode scheduled. Restart required "
-                "so NVIDIA can be disabled before the graphical "
-                "session starts."
-            )
-            return
-
-        write_attribute("dgpu_disable", "1")
-        clear_pending()
-        print("Integrated mode enabled")
-        return
-
-    if target == "Discrete":
-        # The ASUS interface requires the dGPU enabled before asking
-        # firmware to route the display MUX to it.
-        if dgpu == "1":
-            write_attribute("dgpu_disable", "0")
-
-        set_pending("Discrete")
-
-        write_attribute(
-            "gpu_mux_mode",
-            "0",
-            allow_deferred=True,
-        )
+    if pending == target:
+        ensure_transition_service()
 
         print(
-            "Discrete mode selected. Restart required "
-            "to complete the display MUX transition."
+            f"{target} mode is already scheduled. "
+            "Restart required to complete the transition."
         )
         return
 
-    fail("Unsupported graphics mode")
+    # Keep Integrated <-> Discrete transitions deliberately two-step.
+    # This avoids enabling/disabling the dGPU and changing the display
+    # MUX in one shutdown transaction.
+    if (
+        configured == "Integrated"
+        and target == "Discrete"
+    ):
+        fail(
+            "Cannot switch directly from Integrated to Discrete. "
+            "Select Hybrid, restart, then select Discrete."
+        )
+
+    if (
+        configured == "Discrete"
+        and target == "Integrated"
+    ):
+        fail(
+            "Cannot switch directly from Discrete to Integrated. "
+            "Select Hybrid, restart, then select Integrated."
+        )
+
+    # The live graphical session only records intent. The ASUS firmware
+    # attributes are changed during orderly shutdown, after display and
+    # NVIDIA users have been stopped.
+    ensure_transition_service()
+    set_pending(target)
+
+    print(
+        f"{target} mode scheduled. "
+        "Restart required to complete the transition."
+    )
 
 
 def main():
@@ -308,7 +215,16 @@ def main():
             64,
         )
 
-    switch(sys.argv[1])
+    target = sys.argv[1]
+
+    if target not in {
+        "Integrated",
+        "Hybrid",
+        "Discrete",
+    }:
+        fail("Unsupported graphics mode", 64)
+
+    switch(target)
 
 
 if __name__ == "__main__":
