@@ -1,0 +1,15 @@
+[Unit]
+Description=Apply pending IULinux graphics mode
+After=systemd-modules-load.service
+Before=display-manager.service
+Before=nvidia-persistenced.service
+Before=nvidia-powerd.service
+ConditionPathExists=/var/lib/iulinux/graphics-pending-mode
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/iulinux/iulinux-graphics-apply-pending
+TimeoutStartSec=20
+
+[Install]
+WantedBy=multi-user.target

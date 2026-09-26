@@ -1,0 +1,210 @@
+#!/usr/bin/python3
+
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+
+ASUS_ROOT = Path(
+    "/sys/class/firmware-attributes/asus-armoury/attributes"
+)
+
+PENDING_MODE = Path(
+    "/var/lib/iulinux/graphics-pending-mode"
+)
+
+
+def fail(message):
+    print(message, file=sys.stderr)
+    raise SystemExit(1)
+
+
+def read(path):
+    return Path(path).read_text().strip()
+
+
+def wait_for_asus(timeout=8.0):
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        if (
+            (ASUS_ROOT / "dgpu_disable/current_value").is_file()
+            and
+            (ASUS_ROOT / "gpu_mux_mode/current_value").is_file()
+        ):
+            return True
+
+        time.sleep(0.1)
+
+    return False
+
+
+def write(attribute, value):
+    path = ASUS_ROOT / attribute / "current_value"
+    path.write_text(value)
+
+    actual = read(path)
+
+    if actual != value:
+        fail(
+            f"{attribute} boot-time verification failed: "
+            f"requested {value}, read back {actual}"
+        )
+
+
+def nvidia_devices():
+    result = []
+
+    for device in Path("/sys/bus/pci/devices").glob("*"):
+        try:
+            vendor = read(device / "vendor").lower()
+        except Exception:
+            continue
+
+        if vendor == "0x10de":
+            result.append(device)
+
+    return result
+
+
+def nvidia_bound():
+    for device in nvidia_devices():
+        driver = device / "driver"
+
+        if not driver.is_symlink():
+            continue
+
+        if Path(os.path.realpath(driver)).name == "nvidia":
+            return True
+
+    return False
+
+
+def wait_nvidia(timeout=5.0):
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        if nvidia_bound():
+            return True
+
+        time.sleep(0.1)
+
+    return nvidia_bound()
+
+
+def reprobe_nvidia():
+    subprocess.run(
+        ["modprobe", "nvidia"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    subprocess.run(
+        ["udevadm", "settle"],
+        check=False,
+        timeout=5,
+    )
+
+    if nvidia_bound():
+        return True
+
+    probe = Path("/sys/bus/pci/drivers_probe")
+
+    for device in nvidia_devices():
+        if (device / "driver").is_symlink():
+            continue
+
+        try:
+            probe.write_text(device.name)
+        except Exception:
+            continue
+
+    subprocess.run(
+        ["udevadm", "settle"],
+        check=False,
+        timeout=5,
+    )
+
+    return wait_nvidia()
+
+
+def main():
+    if os.geteuid() != 0:
+        fail("Boot-time graphics helper requires root")
+
+    if not PENDING_MODE.is_file():
+        return
+
+    target = read(PENDING_MODE)
+
+    if target not in {"Integrated", "Hybrid", "Discrete"}:
+        fail("Invalid pending graphics mode")
+
+    if not wait_for_asus():
+        fail("ASUS Armoury graphics attributes did not appear")
+
+    dgpu = read(
+        ASUS_ROOT / "dgpu_disable/current_value"
+    )
+
+    mux = read(
+        ASUS_ROOT / "gpu_mux_mode/current_value"
+    )
+
+    if target == "Integrated":
+        if mux != "1":
+            fail(
+                "Integrated cannot be applied while the "
+                "display MUX is configured for Discrete"
+            )
+
+        if dgpu != "1":
+            write("dgpu_disable", "1")
+
+        PENDING_MODE.unlink(missing_ok=True)
+        print("Applied pending Integrated graphics mode")
+        return
+
+    if target == "Hybrid":
+        if mux != "1":
+            fail(
+                "Hybrid MUX transition is still pending firmware reboot"
+            )
+
+        if dgpu != "0":
+            write("dgpu_disable", "0")
+
+        if not reprobe_nvidia():
+            fail(
+                "Hybrid is configured but NVIDIA did not attach "
+                "before the graphical session"
+            )
+
+        PENDING_MODE.unlink(missing_ok=True)
+        print("Applied pending Hybrid graphics mode")
+        return
+
+    if target == "Discrete":
+        if mux != "0":
+            fail(
+                "Discrete MUX transition is still pending firmware reboot"
+            )
+
+        if dgpu != "0":
+            write("dgpu_disable", "0")
+
+        if not reprobe_nvidia():
+            fail(
+                "Discrete is configured but NVIDIA did not attach "
+                "before the graphical session"
+            )
+
+        PENDING_MODE.unlink(missing_ok=True)
+        print("Applied pending Discrete graphics mode")
+
+
+if __name__ == "__main__":
+    main()

@@ -17,6 +17,10 @@ VENDORS = {
     "0x1af4": "VirtIO",
 }
 
+PENDING_MODE = Path(
+    "/var/lib/iulinux/graphics-pending-mode"
+)
+
 
 def plain(value):
     if isinstance(value, dict):
@@ -164,7 +168,7 @@ def asus_armoury_state():
 
     result = {
         "available": False,
-        "current_mode": None,
+        "configured_mode": None,
         "supported_modes": [],
         "pending_reboot": False,
     }
@@ -210,13 +214,13 @@ def asus_armoury_state():
     ]
 
     if dgpu_current == "1":
-        result["current_mode"] = "Integrated"
+        result["configured_mode"] = "Integrated"
 
     elif dgpu_current == "0" and mux_current == "1":
-        result["current_mode"] = "Hybrid"
+        result["configured_mode"] = "Hybrid"
 
     elif dgpu_current == "0" and mux_current == "0":
-        result["current_mode"] = "Discrete"
+        result["configured_mode"] = "Discrete"
 
     pending = root / "pending_reboot"
 
@@ -239,16 +243,103 @@ for gpu in switcheroo["gpus"]:
         break
 
 
-# Do not claim Integrated or Discrete-only capability from GPU count alone.
-# Those modes require a verified machine-specific switching provider.
-if asus["available"] and asus["current_mode"]:
-    current_mode = asus["current_mode"]
+configured_mode = (
+    asus.get("configured_mode")
+    if asus["available"]
+    else None
+)
+
+requested_mode = read_text(PENDING_MODE)
+
+if requested_mode not in {
+    "Integrated",
+    "Hybrid",
+    "Discrete",
+}:
+    requested_mode = configured_mode
+
+
+has_intel = any(
+    device.get("vendor_id") == "0x8086"
+    for device in drm
+)
+
+has_nvidia = any(
+    device.get("vendor_id") == "0x10de"
+    and device.get("driver") == "nvidia"
+    for device in drm
+)
+
+default_nvidia = any(
+    bool(gpu.get("default"))
+    and "nvidia" in str(gpu.get("name", "")).lower()
+    for gpu in switcheroo["gpus"]
+)
+
+
+# Top-level current_mode is runtime truth, not merely what ASUS
+# firmware attributes were last configured to request.
+if asus["available"]:
+    if has_intel and not has_nvidia:
+        current_mode = "Integrated"
+
+    elif has_nvidia and not has_intel:
+        current_mode = "Discrete"
+
+    elif has_intel and has_nvidia:
+        if default_nvidia:
+            current_mode = "Discrete"
+
+        elif switcheroo["dual_gpu"] and offload_available:
+            current_mode = "Hybrid"
+
+        else:
+            current_mode = "Unknown"
+
+    else:
+        current_mode = "Unknown"
+
 elif switcheroo["dual_gpu"]:
     current_mode = "Hybrid"
+
 elif len(drm) == 1:
     current_mode = "Single GPU"
+
 else:
     current_mode = "Unknown"
+
+
+transition_pending = bool(
+    asus["available"]
+    and (
+        asus["pending_reboot"]
+        or (
+            requested_mode
+            and requested_mode != current_mode
+        )
+        or (
+            configured_mode
+            and configured_mode != current_mode
+        )
+    )
+)
+
+reboot_required = bool(
+    asus["available"]
+    and (
+        asus["pending_reboot"]
+        or transition_pending
+    )
+)
+
+transition_status = ""
+
+if transition_pending:
+    target = requested_mode or configured_mode or "requested mode"
+
+    transition_status = (
+        f"Restart to finish switching to {target}."
+    )
 
 
 if asus["available"]:
@@ -273,6 +364,10 @@ print(
                 )
             ),
             "current_mode": current_mode,
+            "configured_mode": configured_mode,
+            "requested_mode": requested_mode,
+            "transition_pending": transition_pending,
+            "transition_status": transition_status,
             "supported_modes": supported_modes,
             "offload_available": offload_available,
             "switcheroo": switcheroo,
@@ -286,11 +381,7 @@ print(
                     if asus["available"]
                     else None
                 ),
-                "reboot_required": (
-                    asus["pending_reboot"]
-                    if asus["available"]
-                    else False
-                ),
+                "reboot_required": reboot_required,
             },
             "asus_armoury": asus,
         },

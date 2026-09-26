@@ -36,6 +36,10 @@ class SystemBackend(QObject):
         self._supported_power_profiles = set()
 
         self._graphics_mode = "Unknown"
+        self._graphics_configured_mode = "Unknown"
+        self._graphics_requested_mode = ""
+        self._graphics_transition_pending = False
+        self._graphics_transition_status = ""
         self._graphics_provider = "Unknown"
         self._graphics_devices = "No GPUs detected"
         self._graphics_offload = False
@@ -130,6 +134,22 @@ class SystemBackend(QObject):
     @Property(str, notify=graphicsChanged)
     def graphicsMode(self):
         return self._graphics_mode
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsConfiguredMode(self):
+        return self._graphics_configured_mode
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsRequestedMode(self):
+        return self._graphics_requested_mode
+
+    @Property(bool, notify=graphicsChanged)
+    def graphicsTransitionPending(self):
+        return self._graphics_transition_pending
+
+    @Property(str, notify=graphicsChanged)
+    def graphicsTransitionStatus(self):
+        return self._graphics_transition_status
 
     @Property(str, notify=graphicsChanged)
     def graphicsProvider(self):
@@ -280,6 +300,10 @@ class SystemBackend(QObject):
 
             new_values = (
                 str(data.get("current_mode", "Unknown")),
+                str(data.get("configured_mode") or "Unknown"),
+                str(data.get("requested_mode") or ""),
+                bool(data.get("transition_pending", False)),
+                str(data.get("transition_status") or ""),
                 str(data.get("provider", "Unknown")),
                 "\n".join(device_names) or "No GPUs detected",
                 bool(data.get("offload_available", False)),
@@ -292,6 +316,10 @@ class SystemBackend(QObject):
 
             old_values = (
                 self._graphics_mode,
+                self._graphics_configured_mode,
+                self._graphics_requested_mode,
+                self._graphics_transition_pending,
+                self._graphics_transition_status,
                 self._graphics_provider,
                 self._graphics_devices,
                 self._graphics_offload,
@@ -307,6 +335,10 @@ class SystemBackend(QObject):
 
             (
                 self._graphics_mode,
+                self._graphics_configured_mode,
+                self._graphics_requested_mode,
+                self._graphics_transition_pending,
+                self._graphics_transition_status,
                 self._graphics_provider,
                 self._graphics_devices,
                 self._graphics_offload,
@@ -358,16 +390,31 @@ class SystemBackend(QObject):
                 self._set_error(
                     message or "Unable to change graphics mode"
                 )
+                self.refreshGraphics()
                 return
 
             self._set_error("")
+
+            # Poll quickly for a few seconds after a mode request so
+            # Settings follows real kernel/firmware state promptly,
+            # while keeping relaxed 5 s polling during normal use.
+            self._graphics_timer.setInterval(350)
             self.refreshGraphics()
+
+            QTimer.singleShot(
+                4000,
+                self._restoreGraphicsPollInterval,
+            )
 
         except subprocess.TimeoutExpired:
             self._set_error("Graphics mode authentication timed out")
 
         except Exception as exc:
             self._set_error(str(exc))
+
+    @Slot()
+    def _restoreGraphicsPollInterval(self):
+        self._graphics_timer.setInterval(5000)
 
     @Slot(str)
     def setPowerMode(self, mode):

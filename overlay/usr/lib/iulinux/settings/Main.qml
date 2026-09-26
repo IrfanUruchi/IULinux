@@ -460,6 +460,30 @@ Kirigami.ApplicationWindow {
                                     }
 
                                     Controls.Label {
+                                        text: "Configured mode"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        text:
+                                            systemBackend.graphicsConfiguredMode
+                                    }
+
+                                    Controls.Label {
+                                        visible:
+                                            systemBackend.graphicsTransitionPending
+                                        text: "Requested mode"
+                                        opacity: 0.65
+                                    }
+
+                                    Controls.Label {
+                                        visible:
+                                            systemBackend.graphicsTransitionPending
+                                        text:
+                                            systemBackend.graphicsRequestedMode
+                                    }
+
+                                    Controls.Label {
                                         text: "Detected GPUs"
                                         opacity: 0.65
                                     }
@@ -574,6 +598,16 @@ Kirigami.ApplicationWindow {
                                                 "Discrete"
                                             )
                                     }
+                                }
+
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    visible:
+                                        systemBackend.graphicsTransitionPending
+                                    text:
+                                        systemBackend.graphicsTransitionStatus
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.8
                                 }
 
                                 Controls.Label {
